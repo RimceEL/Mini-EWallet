@@ -1,0 +1,61 @@
+package com.backend.backend.Auth.Service;
+
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.backend.backend.Auth.HandleException.AddUserError;
+import com.backend.backend.Auth.HandleException.InvalidRegisterRequest;
+import com.backend.backend.Auth.HandleException.UserExistedException;
+import com.backend.backend.Auth.Model.User;
+import com.backend.backend.Auth.Repository.AuthRepository;
+import com.backend.backend.DTO.LoginRequest;
+import com.backend.backend.DTO.RegisterRequest;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final AuthRepository authRepository;
+
+    public User login(LoginRequest request) {
+        if (!ValidationUtils.isValidEmail(request.getEmail()))
+            throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
+        authenticationManager
+                .authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        return authRepository
+                .findUserByEmail(request.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy email: " + request.getEmail()));
+    }
+
+    public User register(RegisterRequest request) {
+        if (!ValidationUtils.isValidUsername(request.getUsername()))
+            throw new InvalidRegisterRequest("Username không hợp lệ! Username phải chứa từ 6 kí tự");
+
+        if (!ValidationUtils.isValidEmail(request.getEmail()))
+            throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
+
+        if (authRepository.findUserByEmail(request.getEmail()).orElse(null) != null)
+            throw new UserExistedException("Email đã tồn tại");
+
+        if (!ValidationUtils.isValidPassword(request.getPassword()))
+            throw new InvalidRegisterRequest("Mật khẩu không hợp lệ! Mật khẩu phải chứa từ 12 kí tự");
+
+        if (!ValidationUtils.isValidFullName(request.getFullName()))
+            throw new InvalidRegisterRequest("Fullname không hợp lệ! Fullname phải chứa từ 6 kí tự");
+        request.setPassword(passwordEncoder.encode(request.getPassword()));
+        return authRepository.register(request)
+                .orElseThrow(() -> new AddUserError("Lỗi khi thêm user vào hệ thống"));
+    }
+
+    public User findUserByEmail(String email) {
+        return authRepository
+                .findUserByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy email: " + email));
+    }
+}
