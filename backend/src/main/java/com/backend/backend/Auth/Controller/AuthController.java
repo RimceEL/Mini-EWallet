@@ -2,9 +2,9 @@ package com.backend.backend.Auth.Controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
-import com.backend.backend.Auth.HandleException.ExpiredRefreshTokenException;
-import com.backend.backend.Auth.HandleException.InvalidRefreshToken;
-import com.backend.backend.Auth.HandleException.UnloginException;
+import com.backend.backend.Auth.CustomException.ExpiredRefreshTokenException;
+import com.backend.backend.Auth.CustomException.InvalidRefreshToken;
+import com.backend.backend.Auth.CustomException.UnloginException;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Service.AuthService;
 import com.backend.backend.Auth.Service.JwtService;
@@ -12,7 +12,6 @@ import com.backend.backend.Auth.Service.RefreshTokenService;
 import com.backend.backend.DTO.ApiResponse;
 import com.backend.backend.DTO.LoginRequest;
 import com.backend.backend.DTO.LoginResponse;
-import com.backend.backend.DTO.LogoutRequest;
 import com.backend.backend.DTO.RefreshTokenRequest;
 import com.backend.backend.DTO.RegisterRequest;
 import com.backend.backend.DTO.RegisterResponse;
@@ -21,7 +20,6 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 
-import java.nio.file.attribute.UserPrincipal;
 import java.util.Date;
 import java.util.UUID;
 

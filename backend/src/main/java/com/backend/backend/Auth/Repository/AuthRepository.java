@@ -3,6 +3,7 @@ package com.backend.backend.Auth.Repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -19,7 +20,7 @@ public class AuthRepository {
     private final JdbcTemplate jdbcTemplate;
     private final RowMapper<User> rowMapper = new BeanPropertyRowMapper<>(User.class);
 
-    public Optional<User> findUserByEmail(String email) {
+    public Optional<User> findUserByEmail(String email) throws DataAccessException {
         String sql = """
                 SELECT * FROM users
                 WHERE email = ?
@@ -28,7 +29,7 @@ public class AuthRepository {
         return result.stream().findFirst();
     }
 
-    public Optional<User> register(RegisterRequest user) {
+    public Optional<User> register(RegisterRequest user) throws DataAccessException {
         String sql = """
                 INSERT INTO users (email, username, password, full_name)
                 VALUES(?,?,?,?)

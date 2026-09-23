@@ -1,6 +1,5 @@
 package com.backend.backend.Auth.Model;
 
-import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -10,46 +9,21 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
-@Entity
-@Table(name = "users")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class User implements UserDetails {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
-
-    @Column(unique = true, nullable = false)
     private String email;
-
-    @Column(unique = true)
     private String username;
-
-    @Column(nullable = false)
     private String password;
-
-    @Enumerated(EnumType.STRING)
     private Role role;
-
-    @Column(name = "full_name")
     private String fullName;
-
-    @Column(name = "phone_number")
     private String phoneNumber;
-
     private String address;
-
-    @Column(name = "is_active")
     private Integer isActive;
-
-    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @Override

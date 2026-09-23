@@ -13,13 +13,14 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import com.backend.backend.Auth.HandleException.AddUserError;
-import com.backend.backend.Auth.HandleException.ExpiredRefreshTokenException;
-import com.backend.backend.Auth.HandleException.InvalidRefreshToken;
-import com.backend.backend.Auth.HandleException.InvalidRegisterRequest;
-import com.backend.backend.Auth.HandleException.UnloginException;
-import com.backend.backend.Auth.HandleException.UserExistedException;
+import com.backend.backend.Auth.CustomException.AddUserError;
+import com.backend.backend.Auth.CustomException.ExpiredRefreshTokenException;
+import com.backend.backend.Auth.CustomException.InvalidRefreshToken;
+import com.backend.backend.Auth.CustomException.InvalidRegisterRequest;
+import com.backend.backend.Auth.CustomException.UnloginException;
+import com.backend.backend.Auth.CustomException.UserExistedException;
 import com.backend.backend.DTO.ErrorResponse;
+import com.backend.backend.Wallet.CustomException.WalletOpenedException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -112,5 +113,18 @@ public class UserGlobalExceptionHandler {
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(WalletOpenedException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ResponseEntity<ErrorResponse> handleWalletOpened(WalletOpenedException ex, HttpServletRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 }

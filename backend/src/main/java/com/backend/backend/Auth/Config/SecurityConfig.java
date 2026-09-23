@@ -23,9 +23,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import com.backend.backend.Auth.CustomException.CustomAccessDeniedHandler;
 import com.backend.backend.Auth.EntryPoint.JwtAuthenticationEntryPoint;
 import com.backend.backend.Auth.Filter.JwtAuthenticationFilter;
-import com.backend.backend.Auth.HandleException.CustomAccessDeniedHandler;
 import com.backend.backend.Auth.Service.MyUserDetailsService;
 
 @Configuration
