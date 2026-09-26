@@ -16,20 +16,14 @@ public class WalletRepository {
     private final JdbcTemplate jdbcTemplate;
     private final RowMapper<Wallet> wallRowMapper = new BeanPropertyRowMapper<>(Wallet.class);
 
-    public Optional<Wallet> findWalletByUserId(String userId) throws DataAccessException {
+    public Optional<Wallet> findWalletByUserEmail(String email) throws DataAccessException {
         String sql = """
-                SELECT * FROM wallets
-                WHERE user_id = ?
+                SELECT w.*
+                FROM wallets w
+                INNER JOIN users u ON w.user_id = u.id
+                WHERE u.email = ?
                 """;
-        return jdbcTemplate.query(sql, wallRowMapper, userId).stream().findFirst();
-    }
-
-    public void createWalletByUserId(String userId) throws DataAccessException {
-        String sql = """
-                INSERT INTO wallets (user_id)
-                VALUES (?)
-                """;
-        jdbcTemplate.update(sql, userId);
+        return jdbcTemplate.query(sql, wallRowMapper, email).stream().findFirst();
     }
 
     public void createWalletByUserEmail(String userEmail) throws DataAccessException {

@@ -1,6 +1,7 @@
 package com.backend.backend.Auth.Filter;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,6 +38,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String userEmail;
         final String jti;
+        final List<String> role;
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -47,6 +49,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             jwt = authHeader.substring(7);
             userEmail = jwtService.extractUsername(jwt);
             jti = jwtService.extractJti(jwt);
+            role = jwtService.extractRoles(jwt);
+
+            if (role.size() == 0) {
+                request.setAttribute("jwt_error", "NOT_USED_ACCESS_TOKEN");
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             if (userEmail == null || jti == null) {
                 request.setAttribute("jwt_error", "TOKEN_INVALID");

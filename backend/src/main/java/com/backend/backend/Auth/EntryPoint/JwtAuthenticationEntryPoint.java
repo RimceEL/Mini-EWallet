@@ -44,6 +44,8 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
                 new ErrorInfo(HttpStatus.UNAUTHORIZED, "Token đã bị thu hồi, vui lòng đăng nhập lại");
             case "USER_IS_BANNED" ->
                 new ErrorInfo(HttpStatus.FORBIDDEN, "Tài khoản đã bị khoá");
+            case "NOT_USED_ACCESS_TOKEN" ->
+                new ErrorInfo(HttpStatus.UNAUTHORIZED, "Vui lòng sử dụng access token để truy cập tài nguyên này");
             default ->
                 new ErrorInfo(HttpStatus.UNAUTHORIZED, "Bạn cần đăng nhập để truy cập tài nguyên này");
         };

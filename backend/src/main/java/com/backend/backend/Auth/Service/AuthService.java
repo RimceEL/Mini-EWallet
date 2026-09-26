@@ -6,7 +6,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.AddUserError;
 import com.backend.backend.Auth.CustomException.InvalidRegisterRequest;
 import com.backend.backend.Auth.CustomException.UserExistedException;
 import com.backend.backend.Auth.Model.User;
@@ -33,7 +32,7 @@ public class AuthService {
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy email: " + request.getEmail()));
     }
 
-    public User register(RegisterRequest request) {
+    public void register(RegisterRequest request) {
         if (!ValidationUtils.isValidUsername(request.getUsername()))
             throw new InvalidRegisterRequest("Username không hợp lệ! Username phải chứa từ 6 kí tự");
 
@@ -49,8 +48,7 @@ public class AuthService {
         if (!ValidationUtils.isValidFullName(request.getFullName()))
             throw new InvalidRegisterRequest("Fullname không hợp lệ! Fullname phải chứa từ 6 kí tự");
         request.setPassword(passwordEncoder.encode(request.getPassword()));
-        return authRepository.register(request)
-                .orElseThrow(() -> new AddUserError("Lỗi khi thêm user vào hệ thống"));
+        authRepository.register(request);
     }
 
     public User findUserByEmail(String email) {

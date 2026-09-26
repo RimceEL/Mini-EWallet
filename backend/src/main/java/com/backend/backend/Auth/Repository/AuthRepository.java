@@ -29,13 +29,12 @@ public class AuthRepository {
         return result.stream().findFirst();
     }
 
-    public Optional<User> register(RegisterRequest user) throws DataAccessException {
+    public void register(RegisterRequest user) throws DataAccessException {
         String sql = """
                 INSERT INTO users (email, username, password, full_name)
                 VALUES(?,?,?,?)
                 """;
         jdbcTemplate.update(sql, user.getEmail(), user.getUsername(), user.getPassword(),
                 user.getFullName());
-        return findUserByEmail(user.getEmail());
     }
 }

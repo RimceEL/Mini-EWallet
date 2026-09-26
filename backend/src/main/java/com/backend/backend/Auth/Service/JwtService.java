@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -114,6 +115,18 @@ public class JwtService {
     private SecretKey getSignInKey() {
         byte[] keyBytes = SERECT_KEY.getBytes();
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public List<String> extractRoles(String token) {
+        Claims claims = extractAllClaims(token);
+        List<Map<String, String>> rolesClaim = claims.get("roles", List.class);
+
+        if (rolesClaim == null) {
+            return new ArrayList<>();
+        }
+        return rolesClaim.stream()
+                .map(roleMap -> roleMap.get("authority"))
+                .collect(Collectors.toList());
     }
 
 }

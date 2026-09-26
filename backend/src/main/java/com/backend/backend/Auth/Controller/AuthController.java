@@ -55,18 +55,9 @@ public class AuthController {
     }
 
     @PostMapping("/auth/register")
-    public ApiResponse<RegisterResponse> register(@RequestBody RegisterRequest request) {
-        User user = authService.register(request);
-        RegisterResponse registerResponse = RegisterResponse
-                .builder().id(user.getId())
-                .email(user.getEmail())
-                .username(user.getName())
-                .fullName(user.getFullName())
-                .role(user.getRole())
-                .isActive(user.isAccountNonLocked())
-                .createdAt(user.getCreatedAt())
-                .build();
-        return new ApiResponse<RegisterResponse>(0, "Register successfully", registerResponse);
+    public ApiResponse<String> register(@RequestBody RegisterRequest request) {
+        authService.register(request);
+        return new ApiResponse<String>(0, "Register successfully", "");
     }
 
     @PostMapping("/auth/refresh-token")
