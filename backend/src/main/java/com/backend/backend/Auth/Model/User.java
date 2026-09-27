@@ -23,6 +23,7 @@ public class User implements UserDetails {
     private String phoneNumber;
     private String address;
     private Integer isActive;
+    private Integer isVerified;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -57,6 +58,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isActive >= 1;
+        return isVerified >= 1;
     }
 }

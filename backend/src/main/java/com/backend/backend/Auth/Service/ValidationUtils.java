@@ -3,7 +3,7 @@ package com.backend.backend.Auth.Service;
 import java.util.regex.Pattern;
 
 public class ValidationUtils {
-    private static final String EMAIL_REGEX = "^[a-zA-Z0-9._%+-]+[0-9]{2,}+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
+    private static final String EMAIL_REGEX = "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$";
     private static final Pattern EMAIL_PATTERN = Pattern.compile(EMAIL_REGEX);
 
     public static boolean isValidEmail(String email) {

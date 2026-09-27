@@ -14,9 +14,13 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.backend.backend.Auth.CustomException.AddUserError;
+import com.backend.backend.Auth.CustomException.EmailNotVerifiedException;
 import com.backend.backend.Auth.CustomException.ExpiredRefreshTokenException;
+import com.backend.backend.Auth.CustomException.ExpiredVerificationCodeException;
 import com.backend.backend.Auth.CustomException.InvalidRefreshToken;
 import com.backend.backend.Auth.CustomException.InvalidRegisterRequest;
+import com.backend.backend.Auth.CustomException.InvalidVerificationCodeException;
+import com.backend.backend.Auth.CustomException.TooManyVerificationAttemptsException;
 import com.backend.backend.Auth.CustomException.UnloginException;
 import com.backend.backend.Auth.CustomException.UserExistedException;
 import com.backend.backend.DTO.ErrorResponse;
@@ -93,7 +97,7 @@ public class UserGlobalExceptionHandler {
         if (ex instanceof BadCredentialsException) {
             customMessage = "Email hoặc mật khẩu không chính xác";
         } else if (ex instanceof DisabledException) {
-            customMessage = "Tài khoản của bạn đã bị vô hiệu hóa";
+            customMessage = "Tài khoản của bạn chưa được xác thực email";
         } else if (ex instanceof LockedException) {
             customMessage = "Tài khoản của bạn đã bị khóa";
         } else if (ex instanceof UnloginException) {
@@ -126,5 +130,38 @@ public class UserGlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
         return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(InvalidVerificationCodeException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<ErrorResponse> handleInvalidCode(InvalidVerificationCodeException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ExpiredVerificationCodeException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<ErrorResponse> handleExpiredCode(ExpiredVerificationCodeException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(TooManyVerificationAttemptsException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ResponseEntity<ErrorResponse> handleTooManyAttempts(TooManyVerificationAttemptsException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    // refactor dùng lại
+    private ResponseEntity<ErrorResponse> buildError(HttpStatus status, String message, HttpServletRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(status.value())
+                .error(status.getReasonPhrase())
+                .message(message)
+                .path(request.getRequestURI())
+                .build();
+        return new ResponseEntity<>(errorResponse, status);
     }
 }

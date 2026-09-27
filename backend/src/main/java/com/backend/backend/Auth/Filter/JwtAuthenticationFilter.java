@@ -72,7 +72,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
                 boolean isValid = jwtService.isTokenValid(jwt, userDetails);
-                if (isValid && userDetails.isEnabled()) {
+                if (isValid && userDetails.isEnabled() && userDetails.isAccountNonLocked()) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
@@ -81,8 +81,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 } else if (!isValid) {
                     request.setAttribute("jwt_error", "TOKEN_INVALID");
-                } else {
+                } else if (!userDetails.isAccountNonLocked()) {
                     request.setAttribute("jwt_error", "USER_IS_BANNED");
+                } else if (!userDetails.isEnabled()) {
+                    request.setAttribute("jwt_error", "USER_IS_NOT_VERIFIED");
                 }
             }
         } catch (ExpiredJwtException e) {

@@ -30,14 +30,13 @@ public class RefreshTokenService {
         stringRedisTemplate.opsForValue().set(key(email, jti), hashedToken, Duration.ofMillis(duration));
     }
 
-    public boolean isExist(String email) {
-        Set<String> keys = stringRedisTemplate.keys("refresh_token:" + email + ":*");
-        return keys != null && !keys.isEmpty();
-    }
+    // public boolean isExist(String email) {
+    // Set<String> keys = stringRedisTemplate.keys("refresh_token:" + email + ":*");
+    // return keys != null && !keys.isEmpty();
+    // }
 
     public boolean isExist(String email, String jti) {
-        Set<String> keys = stringRedisTemplate.keys("refresh_token:" + email + ":" + jti);
-        return keys != null && !keys.isEmpty();
+        return stringRedisTemplate.hasKey(key(email, jti));
     }
 
     public boolean isValid(String email, String jti, String rawToken) {

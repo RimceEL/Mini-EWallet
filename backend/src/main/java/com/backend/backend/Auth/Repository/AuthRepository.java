@@ -37,4 +37,9 @@ public class AuthRepository {
         jdbcTemplate.update(sql, user.getEmail(), user.getUsername(), user.getPassword(),
                 user.getFullName());
     }
+
+    public void markVerified(String email) {
+        String sql = "UPDATE users SET is_verified = 1 WHERE email = ?";
+        jdbcTemplate.update(sql, email);
+    }
 }

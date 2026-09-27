@@ -21,6 +21,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final AuthRepository authRepository;
+    private final EmailVerificationService emailVerificationService;
 
     public User login(LoginRequest request) {
         if (!ValidationUtils.isValidEmail(request.getEmail()))
@@ -49,6 +50,20 @@ public class AuthService {
             throw new InvalidRegisterRequest("Fullname không hợp lệ! Fullname phải chứa từ 6 kí tự");
         request.setPassword(passwordEncoder.encode(request.getPassword()));
         authRepository.register(request);
+        emailVerificationService.generateAndSend(request.getEmail());
+    }
+
+    public void verifyEmail(String email, String code) {
+        emailVerificationService.verify(email, code);
+        authRepository.markVerified(email);
+    }
+
+    public void resendVerificationCode(String email) {
+        User user = findUserByEmail(email);
+        if (user.getIsVerified() != null && user.getIsVerified() >= 1) {
+            throw new InvalidRegisterRequest("Email này đã được xác thực trước đó");
+        }
+        emailVerificationService.generateAndSend(email);
     }
 
     public User findUserByEmail(String email) {
