@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.backend.backend.Auth.CustomException.ExpiredVerificationCodeException;
 import com.backend.backend.Auth.CustomException.InvalidVerificationCodeException;
+import com.backend.backend.Auth.CustomException.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.TooManyVerificationAttemptsException;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,12 @@ public class EmailVerificationService {
     @Value("${app.verification.max-attempts:5}")
     private int maxAttempts;
 
+    @Value("${app.verification.code.resend.expiration-minutes:60}")
+    private long expirationCodeResendMinutes;
+
+    @Value("${app.verification.code.resend.max-attempts:5}")
+    private int maxResendAttemps;
+
     private String codeKey(String email) {
         return "email_verify:code:" + email;
     }
@@ -35,10 +42,26 @@ public class EmailVerificationService {
         return "email_verify:attempts:" + email;
     }
 
+    private String resendAttemptsKey(String email) {
+        return "email_verify:resend:attempts:" + email;
+    }
+
+    public void enforceResendRateLimit(String email) {
+        String resendAttemptsKey = resendAttemptsKey(email);
+        Long attempts = stringRedisTemplate.opsForValue().increment(resendAttemptsKey);
+        if (attempts != null && attempts == 1L) {
+            stringRedisTemplate.expire(resendAttemptsKey, Duration.ofMinutes(expirationCodeResendMinutes));
+        }
+        if (attempts != null && attempts > maxResendAttemps) {
+            throw new TooManyResendAttemptsException(
+                    "Bạn đã gửi yêu cầu gửi mã xác thực quá nhiều lần, vui lòng thử lại sau 1 giờ nữa");
+        }
+    }
+
     public void generateAndSend(String email) {
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
         stringRedisTemplate.opsForValue().set(codeKey(email), code, Duration.ofMinutes(expirationMinutes));
-        stringRedisTemplate.delete(attemptsKey(email)); // reset số lần nhập sai mỗi khi cấp mã mới
+        stringRedisTemplate.delete(attemptsKey(email));
         emailService.sendVerificationCode(email, code);
     }
 

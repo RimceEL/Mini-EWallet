@@ -7,6 +7,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.backend.backend.Auth.CustomException.InvalidRegisterRequest;
+import com.backend.backend.Auth.CustomException.InvalidVerifyRequestException;
+import com.backend.backend.Auth.CustomException.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.UserExistedException;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Repository.AuthRepository;
@@ -59,14 +61,16 @@ public class AuthService {
     }
 
     public void resendVerificationCode(String email) {
-        User user = findUserByEmail(email);
-        if (user.getIsVerified() != null && user.getIsVerified() >= 1) {
-            throw new InvalidRegisterRequest("Email này đã được xác thực trước đó");
+        emailVerificationService.enforceResendRateLimit(email);
+
+        User user = authRepository.findUserByEmail(email).orElse(null);
+        if (user == null || (user.getIsVerified() != null && user.getIsVerified() >= 1) || !user.isAccountNonLocked()) {
+            throw new InvalidVerifyRequestException("Email không tồn tại, bị khoá hoặc đã được xác thực");
         }
         emailVerificationService.generateAndSend(email);
     }
 
-    public User findUserByEmail(String email) {
+    public User findUserByEmail(String email) throws UsernameNotFoundException {
         return authRepository
                 .findUserByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy email: " + email));

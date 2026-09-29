@@ -20,6 +20,8 @@ import com.backend.backend.Auth.CustomException.ExpiredVerificationCodeException
 import com.backend.backend.Auth.CustomException.InvalidRefreshToken;
 import com.backend.backend.Auth.CustomException.InvalidRegisterRequest;
 import com.backend.backend.Auth.CustomException.InvalidVerificationCodeException;
+import com.backend.backend.Auth.CustomException.InvalidVerifyRequestException;
+import com.backend.backend.Auth.CustomException.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.TooManyVerificationAttemptsException;
 import com.backend.backend.Auth.CustomException.UnloginException;
 import com.backend.backend.Auth.CustomException.UserExistedException;
@@ -149,6 +151,20 @@ public class UserGlobalExceptionHandler {
     @ExceptionHandler(TooManyVerificationAttemptsException.class)
     @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
     public ResponseEntity<ErrorResponse> handleTooManyAttempts(TooManyVerificationAttemptsException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidVerifyRequestException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<ErrorResponse> handleInvalidVerify(InvalidVerifyRequestException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(TooManyResendAttemptsException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ResponseEntity<ErrorResponse> handleInvalidVerify(TooManyResendAttemptsException ex,
             HttpServletRequest request) {
         return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
     }
