@@ -8,8 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.ExpiredRefreshTokenException;
-import com.backend.backend.Auth.CustomException.UnloginException;
+import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
+import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
 
 import lombok.RequiredArgsConstructor;
 

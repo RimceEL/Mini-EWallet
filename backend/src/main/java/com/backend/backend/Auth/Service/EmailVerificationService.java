@@ -7,10 +7,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.ExpiredVerificationCodeException;
-import com.backend.backend.Auth.CustomException.InvalidVerificationCodeException;
-import com.backend.backend.Auth.CustomException.TooManyResendAttemptsException;
-import com.backend.backend.Auth.CustomException.TooManyVerificationAttemptsException;
+import com.backend.backend.Auth.CustomException.Email.ExpiredVerificationCodeException;
+import com.backend.backend.Auth.CustomException.Email.InvalidVerificationCodeException;
+import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
+import com.backend.backend.Auth.CustomException.Email.TooManyVerificationAttemptsException;
 
 import lombok.RequiredArgsConstructor;
 

@@ -2,9 +2,9 @@ package com.backend.backend.Auth.Controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
-import com.backend.backend.Auth.CustomException.ExpiredRefreshTokenException;
-import com.backend.backend.Auth.CustomException.InvalidRefreshToken;
-import com.backend.backend.Auth.CustomException.UnloginException;
+import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
+import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
+import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Service.AuthService;
 import com.backend.backend.Auth.Service.JwtService;

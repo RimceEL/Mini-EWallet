@@ -6,10 +6,10 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.InvalidRegisterRequest;
-import com.backend.backend.Auth.CustomException.InvalidVerifyRequestException;
-import com.backend.backend.Auth.CustomException.TooManyResendAttemptsException;
-import com.backend.backend.Auth.CustomException.UserExistedException;
+import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
+import com.backend.backend.Auth.CustomException.Authentication.UserExistedException;
+import com.backend.backend.Auth.CustomException.Email.InvalidVerifyRequestException;
+import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Repository.AuthRepository;
 import com.backend.backend.DTO.LoginRequest;

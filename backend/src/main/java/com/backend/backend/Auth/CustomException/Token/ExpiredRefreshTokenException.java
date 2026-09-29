@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.CustomException;
+package com.backend.backend.Auth.CustomException.Token;
 
 import org.springframework.security.core.AuthenticationException;
 

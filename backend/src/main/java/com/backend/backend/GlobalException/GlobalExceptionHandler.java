@@ -13,25 +13,24 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import com.backend.backend.Auth.CustomException.AddUserError;
-import com.backend.backend.Auth.CustomException.EmailNotVerifiedException;
-import com.backend.backend.Auth.CustomException.ExpiredRefreshTokenException;
-import com.backend.backend.Auth.CustomException.ExpiredVerificationCodeException;
-import com.backend.backend.Auth.CustomException.InvalidRefreshToken;
-import com.backend.backend.Auth.CustomException.InvalidRegisterRequest;
-import com.backend.backend.Auth.CustomException.InvalidVerificationCodeException;
-import com.backend.backend.Auth.CustomException.InvalidVerifyRequestException;
-import com.backend.backend.Auth.CustomException.TooManyResendAttemptsException;
-import com.backend.backend.Auth.CustomException.TooManyVerificationAttemptsException;
-import com.backend.backend.Auth.CustomException.UnloginException;
-import com.backend.backend.Auth.CustomException.UserExistedException;
+import com.backend.backend.Auth.CustomException.Authentication.AddUserError;
+import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
+import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
+import com.backend.backend.Auth.CustomException.Authentication.UserExistedException;
+import com.backend.backend.Auth.CustomException.Email.ExpiredVerificationCodeException;
+import com.backend.backend.Auth.CustomException.Email.InvalidVerificationCodeException;
+import com.backend.backend.Auth.CustomException.Email.InvalidVerifyRequestException;
+import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
+import com.backend.backend.Auth.CustomException.Email.TooManyVerificationAttemptsException;
+import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
+import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
 import com.backend.backend.DTO.ErrorResponse;
 import com.backend.backend.Wallet.CustomException.WalletOpenedException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
-public class UserGlobalExceptionHandler {
+public class GlobalExceptionHandler {
     @ExceptionHandler(UsernameNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ResponseEntity<ErrorResponse> handleUserNotFound(UsernameNotFoundException ex, HttpServletRequest request) {
