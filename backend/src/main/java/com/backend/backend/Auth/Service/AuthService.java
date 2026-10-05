@@ -1,19 +1,21 @@
 package com.backend.backend.Auth.Service;
 
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
+import com.backend.backend.Auth.CustomException.Authentication.LoginLockedException;
 import com.backend.backend.Auth.CustomException.Authentication.UserExistedException;
 import com.backend.backend.Auth.CustomException.Email.InvalidVerifyRequestException;
-import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
+import com.backend.backend.Auth.DTO.LoginRequest;
+import com.backend.backend.Auth.DTO.RegisterRequest;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Repository.AuthRepository;
-import com.backend.backend.DTO.LoginRequest;
-import com.backend.backend.DTO.RegisterRequest;
 
 import lombok.RequiredArgsConstructor;
 
@@ -24,15 +26,27 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final AuthRepository authRepository;
     private final EmailVerificationService emailVerificationService;
+    private final LoginAttemptService loginAttemptService;
 
     public User login(LoginRequest request) {
+        if (loginAttemptService.isBlocked(request.getEmail()))
+            throw new LoginLockedException("Đăng nhập sai quá nhiều lần! Vui lòng thử lại trong "
+                    + loginAttemptService.getRemainingLockSeconds(request.getEmail()) + " giây nữa...");
         if (!ValidationUtils.isValidEmail(request.getEmail()))
             throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
-        authenticationManager
-                .authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-        return authRepository
-                .findUserByEmail(request.getEmail())
-                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy email: " + request.getEmail()));
+        User user;
+        try {
+            Authentication auth = authenticationManager
+                    .authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+            user = (User) auth.getPrincipal();
+
+        } catch (BadCredentialsException e) {
+            loginAttemptService.loginFailed(request.getEmail());
+            throw e;
+        }
+
+        loginAttemptService.loginSucceeded(request.getEmail());
+        return user;
     }
 
     public void register(RegisterRequest request) {

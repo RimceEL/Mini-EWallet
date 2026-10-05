@@ -1,4 +1,4 @@
-package com.backend.backend.DTO;
+package com.backend.backend.Auth.DTO;
 
 import com.backend.backend.Auth.Model.Role;
 import com.fasterxml.jackson.annotation.JsonFormat;

@@ -49,12 +49,17 @@ public class EmailVerificationService {
     public void enforceResendRateLimit(String email) {
         String resendAttemptsKey = resendAttemptsKey(email);
         Long attempts = stringRedisTemplate.opsForValue().increment(resendAttemptsKey);
-        if (attempts != null && attempts == 1L) {
+        if (attempts == null) {
+            return;
+        }
+
+        if (attempts == 1L || attempts == maxResendAttemps) {
             stringRedisTemplate.expire(resendAttemptsKey, Duration.ofMinutes(expirationCodeResendMinutes));
         }
-        if (attempts != null && attempts > maxResendAttemps) {
+        if (attempts > maxResendAttemps) {
             throw new TooManyResendAttemptsException(
-                    "Bạn đã gửi yêu cầu gửi mã xác thực quá nhiều lần, vui lòng thử lại sau 1 giờ nữa");
+                    "Bạn đã gửi yêu cầu gửi mã xác thực quá nhiều lần, vui lòng thử lại sau "
+                            + (expirationCodeResendMinutes / 60) + " giờ nữa");
         }
     }
 
@@ -79,7 +84,7 @@ public class EmailVerificationService {
         String storedCode = stringRedisTemplate.opsForValue().get(codeKey(email));
         if (storedCode == null) {
             throw new ExpiredVerificationCodeException(
-                    "Mã xác thực đã hết hạn hoặc không tồn tại, vui lòng yêu cầu gửi lại mã");
+                    "Mã xác thực đã hết hạn, không tồn tại hoặc email không hợp lệ, vui lòng yêu cầu gửi lại mã");
         }
         if (!storedCode.equals(inputCode)) {
             throw new InvalidVerificationCodeException("Mã xác thực không đúng");

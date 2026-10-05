@@ -5,17 +5,20 @@ import org.springframework.web.bind.annotation.RestController;
 import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
 import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
 import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
+import com.backend.backend.Auth.DTO.LoginRequest;
+import com.backend.backend.Auth.DTO.LoginResponse;
+import com.backend.backend.Auth.DTO.OtpVerifyResponse;
+import com.backend.backend.Auth.DTO.RefreshTokenRequest;
+import com.backend.backend.Auth.DTO.RegisterRequest;
+import com.backend.backend.Auth.DTO.ResendVerificationRequest;
+import com.backend.backend.Auth.DTO.ResetPasswordRequest;
+import com.backend.backend.Auth.DTO.VerifyEmailRequest;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Service.AuthService;
 import com.backend.backend.Auth.Service.JwtService;
+import com.backend.backend.Auth.Service.PasswordResetService;
 import com.backend.backend.Auth.Service.RefreshTokenService;
 import com.backend.backend.DTO.ApiResponse;
-import com.backend.backend.DTO.LoginRequest;
-import com.backend.backend.DTO.LoginResponse;
-import com.backend.backend.DTO.RefreshTokenRequest;
-import com.backend.backend.DTO.RegisterRequest;
-import com.backend.backend.DTO.ResendVerificationRequest;
-import com.backend.backend.DTO.VerifyEmailRequest;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -36,6 +39,7 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final PasswordResetService passwordResetService;
 
     @PostMapping("/auth/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
@@ -129,4 +133,22 @@ public class AuthController {
         return new ApiResponse<String>(0, "Đã gửi lại mã xác thực", "");
     }
 
+    @PostMapping("/auth/otp-reset-request")
+    public ApiResponse<String> otpResetRequest(@RequestBody ResendVerificationRequest request) {
+        passwordResetService.requestReset(request.getEmail());
+        return new ApiResponse<String>(0, "Đã gửi lại mã OTP", "");
+    }
+
+    @PostMapping("/auth/otp-reset-verify")
+    public ApiResponse<OtpVerifyResponse> otpResetVerify(@RequestBody VerifyEmailRequest request) {
+        String token = passwordResetService.verifyOtp(request.getEmail(), request.getCode());
+        OtpVerifyResponse response = OtpVerifyResponse.builder().token(token).build();
+        return new ApiResponse<OtpVerifyResponse>(0, "xác thực OTP thành công", response);
+    }
+
+    @PostMapping("/auth/otp-reset-password")
+    public ApiResponse<String> resetPassword(@RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request.getEmail(), request.getToken(), request.getNewPassword());
+        return new ApiResponse<String>(0, "Đôit mật khẩu thành công", "");
+    }
 }

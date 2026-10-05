@@ -1,4 +1,4 @@
-package com.backend.backend.DTO;
+package com.backend.backend.Auth.DTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ResendVerificationRequest {
-    private String email;
+public class RefreshTokenRequest {
+    private String refreshToken;
 }

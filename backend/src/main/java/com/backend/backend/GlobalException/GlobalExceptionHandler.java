@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.backend.backend.Auth.CustomException.Authentication.AddUserError;
 import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
+import com.backend.backend.Auth.CustomException.Authentication.LoginLockedException;
 import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
 import com.backend.backend.Auth.CustomException.Authentication.UserExistedException;
 import com.backend.backend.Auth.CustomException.Email.ExpiredVerificationCodeException;
@@ -22,6 +23,9 @@ import com.backend.backend.Auth.CustomException.Email.InvalidVerificationCodeExc
 import com.backend.backend.Auth.CustomException.Email.InvalidVerifyRequestException;
 import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.Email.TooManyVerificationAttemptsException;
+import com.backend.backend.Auth.CustomException.Otp.InvalidOtpException;
+import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
+import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
 import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
 import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
 import com.backend.backend.DTO.ErrorResponse;
@@ -97,6 +101,7 @@ public class GlobalExceptionHandler {
 
         if (ex instanceof BadCredentialsException) {
             customMessage = "Email hoặc mật khẩu không chính xác";
+
         } else if (ex instanceof DisabledException) {
             customMessage = "Tài khoản của bạn chưa được xác thực email";
         } else if (ex instanceof LockedException) {
@@ -166,6 +171,34 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidVerify(TooManyResendAttemptsException ex,
             HttpServletRequest request) {
         return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(LoginLockedException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ResponseEntity<ErrorResponse> handleLoginLockedExException(LoginLockedException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ManyOtpException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ResponseEntity<ErrorResponse> handleManyOtp(ManyOtpException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidOtpException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<ErrorResponse> handleInvalidOtp(InvalidOtpException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidResetTokenException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<ErrorResponse> handleInvalidResetToken(InvalidResetTokenException ex,
+            HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
     // refactor dùng lại

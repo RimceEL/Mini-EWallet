@@ -9,8 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import com.backend.backend.Auth.DTO.RegisterRequest;
 import com.backend.backend.Auth.Model.User;
-import com.backend.backend.DTO.RegisterRequest;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,5 +41,14 @@ public class AuthRepository {
     public void markVerified(String email) {
         String sql = "UPDATE users SET is_verified = 1 WHERE email = ?";
         jdbcTemplate.update(sql, email);
+    }
+
+    public void updateUserPassword(User user) throws DataAccessException {
+        String sql = """
+                UPDATE users
+                SET password = ?
+                WHERE email = ?
+                """;
+        jdbcTemplate.update(sql, user.getPassword(), user.getEmail());
     }
 }

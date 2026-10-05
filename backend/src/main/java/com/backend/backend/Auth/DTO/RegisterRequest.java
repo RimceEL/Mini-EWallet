@@ -1,4 +1,4 @@
-package com.backend.backend.DTO;
+package com.backend.backend.Auth.DTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class VerifyEmailRequest {
+public class RegisterRequest {
+
     private String email;
-    private String code;
+
+    private String username;
+
+    private String password;
+
+    private String fullName;
 }
