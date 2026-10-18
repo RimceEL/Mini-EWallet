@@ -59,4 +59,26 @@ public class RefreshTokenService {
         }
         return stringRedisTemplate.delete(keys);
     }
+
+    public String usedKey(String email, String rawToken) {
+        return "used_refresh_token:" + email + ":" + DigestUtils.sha256Hex(rawToken);
+    }
+
+    // Gọi sau khi revoke() thành công: ghi nhớ token này đã được dùng
+    public void markUsed(String email, String rawToken) {
+        stringRedisTemplate.opsForValue().set(usedKey(email, rawToken), "1", Duration.ofMillis(duration));
+    }
+
+    public boolean isUsed(String email, String rawToken) {
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(usedKey(email, rawToken)));
+    }
+
+    // Dùng khi logout
+    public Long clearUsed(String email) {
+        Set<String> keys = stringRedisTemplate.keys("used_refresh_token:" + email + ":*");
+        if (keys == null || keys.isEmpty()) {
+            return 0L;
+        }
+        return stringRedisTemplate.delete(keys);
+    }
 }

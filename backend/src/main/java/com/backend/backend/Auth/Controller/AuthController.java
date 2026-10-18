@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
 import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
 import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
+import com.backend.backend.Auth.CustomException.Token.RefreshTokenIsUsedException;
 import com.backend.backend.Auth.CustomException.Token.RevokingException;
 import com.backend.backend.Auth.DTO.LoginRequest;
 import com.backend.backend.Auth.DTO.LoginResponse;
@@ -78,12 +79,17 @@ public class AuthController {
         } catch (JwtException | IllegalArgumentException | UsernameNotFoundException e) {
             throw new InvalidRefreshToken("");
         }
+        if (refreshTokenService.isUsed(email, refreshToken)) {
+            refreshTokenService.revokeAll(email);
+            throw new RefreshTokenIsUsedException("");
+        }
         if (!refreshTokenService.isValid(email, oldJti, refreshToken))
             throw new UnloginException("");
         User user = authService.findUserByEmail(email);
         if (!refreshTokenService.revoke(email, oldJti)) {
             throw new RevokingException("");
         }
+        refreshTokenService.markUsed(email, refreshToken);
         Date expiredDate = jwtService.extractExpiration(refreshToken);
         String jti = UUID.randomUUID().toString();
         String newAccessToken = jwtService.accessTokenGenerate(user, jti);
@@ -114,6 +120,7 @@ public class AuthController {
         if (!refreshTokenService.isValid(email, oldJti, refreshToken))
             throw new UnloginException("");
         refreshTokenService.revoke(email, oldJti);
+        refreshTokenService.clearUsed(email);
         return "Logout Successfully";
     }
 

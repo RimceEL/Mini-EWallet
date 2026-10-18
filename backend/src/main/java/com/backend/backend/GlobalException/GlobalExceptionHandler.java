@@ -28,6 +28,7 @@ import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
 import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
 import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
 import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
+import com.backend.backend.Auth.CustomException.Token.RefreshTokenIsUsedException;
 import com.backend.backend.Auth.CustomException.Token.RevokingException;
 import com.backend.backend.DTO.ErrorResponse;
 import com.backend.backend.Wallet.CustomException.WalletOpenedException;
@@ -114,7 +115,9 @@ public class GlobalExceptionHandler {
         } else if (ex instanceof InvalidRefreshToken) {
             customMessage = "Refresh Token không hợp lệ";
         } else if (ex instanceof RevokingException) {
-            customMessage = "Token đang thu hồi bởi một request khác";
+            customMessage = "RefreshToken đang thu hồi bởi một request khác";
+        } else if (ex instanceof RefreshTokenIsUsedException) {
+            customMessage = "RefreshToken bị phát hiện là sử dụng lại, đang thực hiện đăng xuất toàn bộ...";
         }
 
         ErrorResponse errorResponse = ErrorResponse.builder()
