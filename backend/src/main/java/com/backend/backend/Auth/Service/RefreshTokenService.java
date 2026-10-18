@@ -48,14 +48,15 @@ public class RefreshTokenService {
         return stored.equals(DigestUtils.sha256Hex(rawToken));
     }
 
-    public void revoke(String email, String jti) {
-        stringRedisTemplate.delete(key(email, jti));
+    public boolean revoke(String email, String jti) {
+        return stringRedisTemplate.delete(key(email, jti));
     }
 
-    public void revokeAll(String email) {
+    public Long revokeAll(String email) {
         Set<String> keys = stringRedisTemplate.keys("refresh_token:" + email + ":*");
-        if (keys != null && !keys.isEmpty()) {
-            stringRedisTemplate.delete(keys);
+        if (keys == null || keys.isEmpty()) {
+            return 0L;
         }
+        return stringRedisTemplate.delete(keys);
     }
 }

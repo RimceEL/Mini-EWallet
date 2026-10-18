@@ -28,6 +28,7 @@ import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
 import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
 import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
 import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
+import com.backend.backend.Auth.CustomException.Token.RevokingException;
 import com.backend.backend.DTO.ErrorResponse;
 import com.backend.backend.Wallet.CustomException.WalletOpenedException;
 
@@ -112,6 +113,8 @@ public class GlobalExceptionHandler {
             customMessage = "Refresh Token đã hết hạn, vui lòng đăng nhập lại";
         } else if (ex instanceof InvalidRefreshToken) {
             customMessage = "Refresh Token không hợp lệ";
+        } else if (ex instanceof RevokingException) {
+            customMessage = "Token đang thu hồi bởi một request khác";
         }
 
         ErrorResponse errorResponse = ErrorResponse.builder()

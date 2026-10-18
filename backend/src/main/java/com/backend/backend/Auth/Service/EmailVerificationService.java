@@ -20,7 +20,7 @@ public class EmailVerificationService {
 
     private final StringRedisTemplate stringRedisTemplate;
     private final EmailService emailService;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${app.verification.expiration-minutes:10}")
     private long expirationMinutes;

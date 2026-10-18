@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthRepository {
     private final JdbcTemplate jdbcTemplate;
-    private final RowMapper<User> rowMapper = new BeanPropertyRowMapper<>(User.class);
+    private static final RowMapper<User> rowMapper = new BeanPropertyRowMapper<>(User.class);
 
     public Optional<User> findUserByEmail(String email) throws DataAccessException {
         String sql = """

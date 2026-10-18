@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
 import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
 import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
+import com.backend.backend.Auth.CustomException.Token.RevokingException;
 import com.backend.backend.Auth.DTO.LoginRequest;
 import com.backend.backend.Auth.DTO.LoginResponse;
 import com.backend.backend.Auth.DTO.OtpVerifyResponse;
@@ -77,16 +78,17 @@ public class AuthController {
         } catch (JwtException | IllegalArgumentException | UsernameNotFoundException e) {
             throw new InvalidRefreshToken("");
         }
-
-        User user = authService.findUserByEmail(email);
         if (!refreshTokenService.isValid(email, oldJti, refreshToken))
             throw new UnloginException("");
+        User user = authService.findUserByEmail(email);
+        if (!refreshTokenService.revoke(email, oldJti)) {
+            throw new RevokingException("");
+        }
         Date expiredDate = jwtService.extractExpiration(refreshToken);
         String jti = UUID.randomUUID().toString();
         String newAccessToken = jwtService.accessTokenGenerate(user, jti);
         String newRefreshToken = jwtService.refreshTokenGenerate(user, jti,
                 expiredDate.getTime() - new Date().getTime());
-        refreshTokenService.revoke(email, oldJti);
         refreshTokenService.store(email, jti, newRefreshToken);
         LoginResponse loginResponse = LoginResponse
                 .builder()
@@ -114,12 +116,6 @@ public class AuthController {
         refreshTokenService.revoke(email, oldJti);
         return "Logout Successfully";
     }
-
-    // Lưu ý (logout): Nếu không truyền Bearer token (ACC hoặc RE), user sẽ là null
-    // do không
-    // có context holder set, hoặc khi đã đăng xuất, redis ko lưu trạng thái, nên
-    // nếu có truyền token thì nó sẽ đi qua JwtFilter và bị chặn do ko match với
-    // redis và cũng trả về user là null
 
     @PostMapping("/auth/verify-email")
     public ApiResponse<String> verifyEmail(@RequestBody VerifyEmailRequest request) {

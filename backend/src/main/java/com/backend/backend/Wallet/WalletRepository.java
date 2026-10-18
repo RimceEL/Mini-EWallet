@@ -14,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WalletRepository {
     private final JdbcTemplate jdbcTemplate;
-    private final RowMapper<Wallet> wallRowMapper = new BeanPropertyRowMapper<>(Wallet.class);
+    private static final RowMapper<Wallet> wallRowMapper = new BeanPropertyRowMapper<>(Wallet.class);
 
     public Optional<Wallet> findWalletByUserEmail(String email) throws DataAccessException {
         String sql = """
