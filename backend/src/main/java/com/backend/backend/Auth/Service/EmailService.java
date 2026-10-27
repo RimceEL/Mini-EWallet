@@ -8,6 +8,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import com.backend.backend.Transaction.Transaction;
+
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -97,6 +99,13 @@ public class EmailService {
                         + "Nếu không phải bạn thực hiện, hãy liên hệ hỗ trợ ngay.");
     }
 
+    @Async
+    public void sendTransactionOtp(String to, String otp, int ttlMinutes, Transaction transaction) {
+        send(to, "Mã xác thực cho giao dịch " + transaction.getReferenceId(),
+                "Mã OTP của bạn là: " + otp + "\n"
+                        + "Mã có hiệu lực trong " + ttlMinutes + " phút. Không chia sẻ mã này cho bất kỳ ai.");
+    }
+
     private void send(String to, String subject, String text) {
         try {
             SimpleMailMessage msg = new SimpleMailMessage();
@@ -107,6 +116,7 @@ public class EmailService {
             mailSender.send(msg);
         } catch (MailException e) {
             System.err.println("Lỗi khi gửi email xác thực: " + e.getMessage());
+            throw e;
         }
     }
 }

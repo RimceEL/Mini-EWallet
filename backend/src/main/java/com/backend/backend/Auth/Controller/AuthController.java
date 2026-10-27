@@ -152,6 +152,6 @@ public class AuthController {
     @PostMapping("/auth/otp-reset-password")
     public ApiResponse<String> resetPassword(@RequestBody ResetPasswordRequest request) {
         passwordResetService.resetPassword(request.getEmail(), request.getToken(), request.getNewPassword());
-        return new ApiResponse<String>(0, "Đôit mật khẩu thành công", "");
+        return new ApiResponse<String>(0, "Đổi mật khẩu thành công", "");
     }
 }

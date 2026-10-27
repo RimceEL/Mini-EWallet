@@ -11,9 +11,11 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mail.MailException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.backend.backend.AOP.RateLimiter;
 import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
 import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.Otp.InvalidOtpException;
@@ -21,6 +23,7 @@ import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
 import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Repository.AuthRepository;
+import com.backend.backend.Transaction.CustomException.MailSendFailedException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,6 +35,7 @@ public class PasswordResetService {
     private static final String OTP_FAIL_PREFIX = "pwreset:otp-fail:";
     private static final String TOKEN_PREFIX = "pwreset:token:";
     private static final String RESEND_PREFIX = "pwreset:resend:";
+    private static final String REFUND_PREFIX = "pwreset:refund:";
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -42,6 +46,7 @@ public class PasswordResetService {
     private final EmailService emailService;
     private final RefreshTokenService refreshTokenService;
     private final LoginAttemptService loginAttemptService;
+    private final RateLimiter rateLimiter;
 
     @Value("${app.password-reset.resend.max-attempts:5}")
     private int maxResendAttempts;
@@ -58,18 +63,29 @@ public class PasswordResetService {
      * Bước 1: xin OTP. Luôn trả về bình thường dù email có tồn tại hay không.
      */
     public void requestReset(String email) {
-        enforceResendLimit(email);
-
-        if (authRepository.findUserByEmail(email).isEmpty()) {
+        String key = RESEND_PREFIX + email;
+        Long attempts = rateLimiter.hit(key, resendLockHours * 3600L, maxResendAttempts);
+        if (attempts > maxResendAttempts)
+            throw new TooManyResendAttemptsException(
+                    "Bạn đã yêu cầu gửi mã quá nhiều lần, vui lòng thử lại sau " + resendLockHours + " giờ nữa");
+        if (authRepository.findUserByEmail(email).isEmpty())
             return;
-        }
-
         String otp = otpService.generate();
-
-        redis.opsForValue().set(OTP_PREFIX + email, otpService.hash(otp), Duration.ofMinutes(otpTtlMinutes));
-        redis.delete(OTP_FAIL_PREFIX + email);
-
-        emailService.sendPasswordResetOtp(email, otp, otpTtlMinutes);
+        rateLimiter.setExAndDelete(
+                OTP_PREFIX + email,
+                otpService.hash(otp),
+                Duration.ofMinutes(otpTtlMinutes),
+                OTP_FAIL_PREFIX + email);
+        try {
+            emailService.sendPasswordResetOtp(email, otp, otpTtlMinutes);
+        } catch (MailException e) {
+            String refundKey = REFUND_PREFIX + email;
+            if (rateLimiter.hit(refundKey, 24 * 3600L, 3) <= 3) { // tối đa 3 lần hoàn mỗi 24 giờ
+                rateLimiter.refund(key);
+            }
+            throw new MailSendFailedException( // Vẫn có thể ném exception dù đã gửi mail thành công
+                    "Chưa xác nhận được việc gửi email. Nếu bạn đã nhận được mã thì cứ nhập, nếu chưa thì hãy yêu cầu gửi lại");
+        }
     }
 
     /**
@@ -82,34 +98,29 @@ public class PasswordResetService {
         String failKey = OTP_FAIL_PREFIX + email;
 
         String storedHash = redis.opsForValue().get(otpKey);
-        if (storedHash == null) {
-            throw new InvalidOtpException(OTP_INVALID_MSG);
-        }
 
         // Đếm lần thử TRƯỚC khi so sánh → request song song cũng không vượt được giới
         // hạn
-        Long fails = redis.opsForValue().increment(failKey);
-        if (fails != null && fails == 1L) {
-            redis.expire(failKey, Duration.ofMinutes(otpTtlMinutes));
-        }
+        Long fails = rateLimiter.hit(failKey, otpTtlMinutes * 60L * 2L, maxOtpAttempts);
         if (fails != null && fails > maxOtpAttempts) {
             redis.delete(otpKey); // sai quá số lần → hủy OTP, phải xin mã mới
             throw new ManyOtpException("Bạn đã nhập sai OTP quá nhiều lần, vui lòng yêu cầu cấp mã mới");
         }
 
-        if (!otpService.matches(otp, storedHash)) {
+        // compareAndDelete chỉ thành công với đúng 1 request
+        if (storedHash == null
+                || !otpService.matches(otp, storedHash)
+                || !rateLimiter.compareAndDelete(otpKey, storedHash)) // Kiểm tra otp thật sự trong redis thêm lần nữa
+                                                                      // vì có thể otp thật đã bị ghi đè do một
+                                                                      // request send otp
             throw new InvalidOtpException(OTP_INVALID_MSG);
-        }
-
-        // delete() chỉ trả true cho đúng 1 request → OTP chỉ đổi được 1 lần
-        if (!Boolean.TRUE.equals(redis.delete(otpKey))) {
-            throw new InvalidOtpException(OTP_INVALID_MSG);
-        }
-        redis.delete(failKey); // xóa bộ đếm sai sau khi thành công
 
         String token = generateToken();
-        // key = prefix + email, value = hash của token (ghi đè token cũ nếu có)
-        redis.opsForValue().set(TOKEN_PREFIX + email, sha256(token), Duration.ofMinutes(tokenTtlMinutes));
+        rateLimiter.setExAndDelete(
+                TOKEN_PREFIX + email,
+                sha256(token),
+                Duration.ofMinutes(tokenTtlMinutes),
+                failKey);
         return token;
     }
 
@@ -129,19 +140,15 @@ public class PasswordResetService {
 
         String tokenKey = TOKEN_PREFIX + email;
         String storedHash = redis.opsForValue().get(tokenKey);
+
+        // compareAndDelete chỉ thành công với đúng 1 request
         if (storedHash == null
                 || !MessageDigest.isEqual(
                         storedHash.getBytes(StandardCharsets.UTF_8),
-                        sha256(token).getBytes(StandardCharsets.UTF_8))) {
+                        sha256(token).getBytes(StandardCharsets.UTF_8))
+                || !rateLimiter.compareAndDelete(tokenKey, storedHash))
             throw new InvalidResetTokenException(TOKEN_INVALID_MSG);
-        }
 
-        // delete() chỉ trả true cho đúng 1 request → token chỉ dùng được 1 lần
-        if (!Boolean.TRUE.equals(redis.delete(tokenKey))) {
-            throw new InvalidResetTokenException(TOKEN_INVALID_MSG);
-        }
-
-        // phần còn lại giữ nguyên như code cũ
         User user = authRepository.findUserByEmail(email)
                 .orElseThrow(InvalidResetTokenException::new);
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -152,8 +159,6 @@ public class PasswordResetService {
         redis.delete(List.of(OTP_PREFIX + email, OTP_FAIL_PREFIX + email, RESEND_PREFIX + email));
         emailService.sendPasswordChangedNotice(email);
     }
-
-    // ---------- private ----------
 
     private String generateToken() {
         byte[] bytes = new byte[32]; // 256 bit
@@ -167,22 +172,6 @@ public class PasswordResetService {
             return HexFormat.of().formatHex(md.digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
-        }
-    }
-
-    private void enforceResendLimit(String email) {
-        String key = RESEND_PREFIX + email;
-
-        Long attempts = redis.opsForValue().increment(key);
-        if (attempts == null) {
-            return;
-        }
-        if (attempts == 1L || attempts == maxResendAttempts) {
-            redis.expire(key, Duration.ofHours(resendLockHours));
-        }
-        if (attempts > maxResendAttempts) {
-            throw new TooManyResendAttemptsException(
-                    "Bạn đã yêu cầu gửi mã quá nhiều lần, vui lòng thử lại sau " + resendLockHours + " giờ nữa");
         }
     }
 }

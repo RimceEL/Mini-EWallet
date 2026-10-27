@@ -10,7 +10,6 @@ import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.backend.backend.Auth.CustomException.Authentication.AddUserError;
@@ -31,184 +30,107 @@ import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
 import com.backend.backend.Auth.CustomException.Token.RefreshTokenIsUsedException;
 import com.backend.backend.Auth.CustomException.Token.RevokingException;
 import com.backend.backend.DTO.ErrorResponse;
+import com.backend.backend.Transaction.CustomException.DuplicateTransactionException;
+import com.backend.backend.Transaction.CustomException.InvalidTransactionException;
+import com.backend.backend.Transaction.CustomException.MailSendFailedException;
+import com.backend.backend.Transaction.CustomException.NotEnoughAmountException;
+import com.backend.backend.Transaction.CustomException.NotUserTransaction;
+import com.backend.backend.Transaction.CustomException.TransactionError;
+import com.backend.backend.Transaction.CustomException.TransactionNotFound;
+import com.backend.backend.Transaction.CustomException.TransactionRecordError;
 import com.backend.backend.Wallet.CustomException.WalletOpenedException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(UsernameNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(UsernameNotFoundException ex, HttpServletRequest request) {
-        ErrorResponse error = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.NOT_FOUND.value())
-                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    // 403
+    @ExceptionHandler(NotUserTransaction.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
-    @ExceptionHandler(UserExistedException.class)
-    @ResponseStatus(HttpStatus.CONFLICT)
-    public ResponseEntity<ErrorResponse> handleUserExisted(UserExistedException ex, HttpServletRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error(HttpStatus.CONFLICT.getReasonPhrase())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
+    // 404
+    @ExceptionHandler({ UsernameNotFoundException.class, TransactionNotFound.class })
+    public ResponseEntity<ErrorResponse> handleNotFound(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
-    @ExceptionHandler(AddUserError.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ResponseEntity<ErrorResponse> handleAddUserError(AddUserError ex, HttpServletRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+    // 409
+    @ExceptionHandler({
+            UserExistedException.class,
+            WalletOpenedException.class,
+            DuplicateTransactionException.class,
+            TransactionError.class })
+    public ResponseEntity<ErrorResponse> handleConflict(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
-    @ExceptionHandler(InvalidRegisterRequest.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResponseEntity<ErrorResponse> handleInvalidRequestRegister(InvalidRegisterRequest ex,
-            HttpServletRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    // 500
+    @ExceptionHandler({ AddUserError.class, TransactionRecordError.class })
+    public ResponseEntity<ErrorResponse> handleServerError(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request);
     }
 
+    // 502
+    @ExceptionHandler(MailSendFailedException.class)
+    public ResponseEntity<ErrorResponse> handleBadGateway(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_GATEWAY, ex.getMessage(), request);
+    }
+
+    // 400
+    @ExceptionHandler({
+            InvalidRegisterRequest.class,
+            InvalidVerificationCodeException.class,
+            ExpiredVerificationCodeException.class,
+            InvalidVerifyRequestException.class,
+            InvalidOtpException.class,
+            InvalidResetTokenException.class,
+            InvalidTransactionException.class,
+            NotEnoughAmountException.class })
+    public ResponseEntity<ErrorResponse> handleBadRequest(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    // 429
+    @ExceptionHandler({
+            TooManyVerificationAttemptsException.class,
+            TooManyResendAttemptsException.class,
+            LoginLockedException.class,
+            ManyOtpException.class })
+    public ResponseEntity<ErrorResponse> handleTooManyRequests(Exception ex, HttpServletRequest request) {
+        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    // 401
     @ExceptionHandler(AuthenticationException.class)
-    @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException ex,
+    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex,
             HttpServletRequest request) {
-
-        String customMessage = "Xác thực thất bại";
+        String message = "Xác thực thất bại";
 
         if (ex instanceof BadCredentialsException) {
-            customMessage = "Email hoặc mật khẩu không chính xác";
-
+            message = "Email hoặc mật khẩu không chính xác";
         } else if (ex instanceof DisabledException) {
-            customMessage = "Tài khoản của bạn chưa được xác thực email";
+            message = "Tài khoản của bạn chưa được xác thực email";
         } else if (ex instanceof LockedException) {
-            customMessage = "Tài khoản của bạn đã bị khóa";
+            message = "Tài khoản của bạn đã bị khóa";
         } else if (ex instanceof UnloginException) {
-            customMessage = "Người dùng chưa đăng nhập hoặc Refresh Token không hợp lệ";
+            message = "Người dùng chưa đăng nhập hoặc Refresh Token không hợp lệ";
         } else if (ex instanceof ExpiredRefreshTokenException) {
-            customMessage = "Refresh Token đã hết hạn, vui lòng đăng nhập lại";
+            message = "Refresh Token đã hết hạn, vui lòng đăng nhập lại";
         } else if (ex instanceof InvalidRefreshToken) {
-            customMessage = "Refresh Token không hợp lệ";
+            message = "Refresh Token không hợp lệ";
         } else if (ex instanceof RevokingException) {
-            customMessage = "RefreshToken đang thu hồi bởi một request khác";
+            message = "RefreshToken đang thu hồi bởi một request khác";
         } else if (ex instanceof RefreshTokenIsUsedException) {
-            customMessage = "RefreshToken bị phát hiện là sử dụng lại, đang thực hiện đăng xuất toàn bộ...";
+            message = "RefreshToken bị phát hiện là sử dụng lại, đang thực hiện đăng xuất toàn bộ...";
         }
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error(HttpStatus.UNAUTHORIZED.getReasonPhrase())
-                .message(customMessage)
-                .path(request.getRequestURI())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+        return buildError(HttpStatus.UNAUTHORIZED, message, request);
     }
 
-    @ExceptionHandler(WalletOpenedException.class)
-    @ResponseStatus(HttpStatus.CONFLICT)
-    public ResponseEntity<ErrorResponse> handleWalletOpened(WalletOpenedException ex, HttpServletRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error(HttpStatus.CONFLICT.getReasonPhrase())
-                .message(ex.getMessage())
-                .path(request.getRequestURI())
-                .build();
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
-    }
-
-    @ExceptionHandler(InvalidVerificationCodeException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResponseEntity<ErrorResponse> handleInvalidCode(InvalidVerificationCodeException ex,
+    private ResponseEntity<ErrorResponse> buildError(HttpStatus status, String message,
             HttpServletRequest request) {
-        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(ExpiredVerificationCodeException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResponseEntity<ErrorResponse> handleExpiredCode(ExpiredVerificationCodeException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(TooManyVerificationAttemptsException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public ResponseEntity<ErrorResponse> handleTooManyAttempts(TooManyVerificationAttemptsException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(InvalidVerifyRequestException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResponseEntity<ErrorResponse> handleInvalidVerify(InvalidVerifyRequestException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(TooManyResendAttemptsException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public ResponseEntity<ErrorResponse> handleInvalidVerify(TooManyResendAttemptsException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(LoginLockedException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public ResponseEntity<ErrorResponse> handleLoginLockedExException(LoginLockedException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(ManyOtpException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public ResponseEntity<ErrorResponse> handleManyOtp(ManyOtpException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(InvalidOtpException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResponseEntity<ErrorResponse> handleInvalidOtp(InvalidOtpException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(InvalidResetTokenException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResponseEntity<ErrorResponse> handleInvalidResetToken(InvalidResetTokenException ex,
-            HttpServletRequest request) {
-        return buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
-    }
-
-    // refactor dùng lại
-    private ResponseEntity<ErrorResponse> buildError(HttpStatus status, String message, HttpServletRequest request) {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(status.value())
