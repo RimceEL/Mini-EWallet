@@ -14,13 +14,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.AOP.RateLimiter;
 import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.Otp.InvalidOtpException;
 import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
 import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
 import com.backend.backend.Auth.Service.EmailService;
 import com.backend.backend.Auth.Service.OtpService;
+import com.backend.backend.Custom.RateLimiter;
 import com.backend.backend.Transaction.CustomException.InvalidTransactionException;
 import com.backend.backend.Transaction.CustomException.MailSendFailedException;
 import com.backend.backend.Transaction.CustomException.NotUserTransaction;

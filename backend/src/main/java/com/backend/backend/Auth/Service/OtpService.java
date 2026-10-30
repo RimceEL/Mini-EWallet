@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 public class OtpService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
-    private static final int OTP_BOUND = 100_000_000; // 8 chữ số
+    private static final int OTP_BOUND = 100_000_000;
 
     private final SecretKeySpec keySpec;
 
@@ -24,12 +24,10 @@ public class OtpService {
         this.keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
-    /** Sinh OTP 8 số, giữ cả số 0 ở đầu (vd "00123456"). */
     public String generate() {
         return String.format("%08d", RANDOM.nextInt(OTP_BOUND));
     }
 
-    /** HMAC-SHA256 với secret của server. */
     public String hash(String otp) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -40,7 +38,6 @@ public class OtpService {
         }
     }
 
-    /** So sánh constant-time để tránh timing attack. */
     public boolean matches(String rawOtp, String storedHash) {
         if (rawOtp == null || storedHash == null) {
             return false;

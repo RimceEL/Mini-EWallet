@@ -15,7 +15,6 @@ import org.springframework.mail.MailException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.AOP.RateLimiter;
 import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
 import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.Otp.InvalidOtpException;
@@ -23,6 +22,7 @@ import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
 import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Repository.AuthRepository;
+import com.backend.backend.Custom.RateLimiter;
 import com.backend.backend.Transaction.CustomException.MailSendFailedException;
 
 import lombok.RequiredArgsConstructor;

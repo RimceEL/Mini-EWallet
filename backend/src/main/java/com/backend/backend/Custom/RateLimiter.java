@@ -1,4 +1,4 @@
-package com.backend.backend.AOP;
+package com.backend.backend.Custom;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -73,13 +73,13 @@ public class RateLimiter {
         redis.execute(SET_EX_AND_DEL, keys, value, String.valueOf(ttl.toSeconds()));
     }
 
-    public String key(String expression, ProceedingJoinPoint pjp) {
-        String[] names = ((MethodSignature) pjp.getSignature()).getParameterNames();
-        Object[] args = pjp.getArgs();
-        StandardEvaluationContext context = new StandardEvaluationContext();
-        for (int i = 0; i < names.length; i++) {
-            context.setVariable(names[i], args[i]);
-        }
-        return PARSER.parseExpression(expression).getValue(context, String.class);
+    private static final DefaultRedisScript<Long> INCR_AND_EXPIRE = new DefaultRedisScript<>("""
+            local n = redis.call('INCR', KEYS[1])
+            redis.call('EXPIRE', KEYS[1], ARGV[1])
+            return n
+            """, Long.class);
+
+    public Long incrementAndExpire(String key, Duration ttl) {
+        return redis.execute(INCR_AND_EXPIRE, List.of(key), String.valueOf(ttl.toSeconds()));
     }
 }

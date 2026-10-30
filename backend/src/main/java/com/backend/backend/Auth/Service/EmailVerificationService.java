@@ -11,6 +11,7 @@ import com.backend.backend.Auth.CustomException.Email.ExpiredVerificationCodeExc
 import com.backend.backend.Auth.CustomException.Email.InvalidVerificationCodeException;
 import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.Email.TooManyVerificationAttemptsException;
+import com.backend.backend.Custom.RateLimiter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +22,7 @@ public class EmailVerificationService {
     private final StringRedisTemplate stringRedisTemplate;
     private final EmailService emailService;
     private static final SecureRandom secureRandom = new SecureRandom();
+    private final RateLimiter rateLimiter;
 
     @Value("${app.verification.expiration-minutes:10}")
     private long expirationMinutes;
@@ -48,14 +50,7 @@ public class EmailVerificationService {
 
     public void enforceResendRateLimit(String email) {
         String resendAttemptsKey = resendAttemptsKey(email);
-        Long attempts = stringRedisTemplate.opsForValue().increment(resendAttemptsKey);
-        if (attempts == null) {
-            return;
-        }
-
-        if (attempts == 1L || attempts == maxResendAttemps) {
-            stringRedisTemplate.expire(resendAttemptsKey, Duration.ofMinutes(expirationCodeResendMinutes));
-        }
+        Long attempts = rateLimiter.hit(resendAttemptsKey, expirationCodeResendMinutes * 60L, maxResendAttemps);
         if (attempts > maxResendAttemps) {
             throw new TooManyResendAttemptsException(
                     "Bạn đã gửi yêu cầu gửi mã xác thực quá nhiều lần, vui lòng thử lại sau "
@@ -65,22 +60,17 @@ public class EmailVerificationService {
 
     public void generateAndSend(String email) {
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
-        stringRedisTemplate.opsForValue().set(codeKey(email), code, Duration.ofMinutes(expirationMinutes));
-        stringRedisTemplate.delete(attemptsKey(email));
+        rateLimiter.setExAndDelete(codeKey(email), code, Duration.ofMinutes(expirationMinutes), attemptsKey(email));
         emailService.sendVerificationCode(email, code);
     }
 
     public void verify(String email, String inputCode) {
         String attemptsKey = attemptsKey(email);
-        Long attempts = stringRedisTemplate.opsForValue().increment(attemptsKey);
-        if (attempts != null && attempts == 1L) {
-            stringRedisTemplate.expire(attemptsKey, Duration.ofMinutes(expirationMinutes));
-        }
+        Long attempts = rateLimiter.hit(attemptsKey, expirationMinutes * 60L, 1L);
         if (attempts != null && attempts > maxAttempts) {
             throw new TooManyVerificationAttemptsException(
                     "Bạn đã nhập sai quá số lần cho phép, vui lòng yêu cầu gửi lại mã");
         }
-
         String storedCode = stringRedisTemplate.opsForValue().get(codeKey(email));
         if (storedCode == null) {
             throw new ExpiredVerificationCodeException(
