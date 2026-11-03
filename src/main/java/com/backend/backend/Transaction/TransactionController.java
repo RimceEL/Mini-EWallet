@@ -7,7 +7,6 @@ import com.backend.backend.Auth.Model.User;
 import com.backend.backend.DTO.ApiResponse;
 import com.backend.backend.Transaction.DTO.SendOtpRequest;
 import com.backend.backend.Transaction.DTO.TopUpRequest;
-import com.backend.backend.Transaction.DTO.TopUpResponse;
 import com.backend.backend.Transaction.DTO.TransactionRequest;
 import com.backend.backend.Transaction.DTO.TransactionResponse;
 import com.backend.backend.Transaction.DTO.TransferRequest;

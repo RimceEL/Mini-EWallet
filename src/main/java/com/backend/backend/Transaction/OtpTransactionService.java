@@ -11,18 +11,17 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 
 import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
 import com.backend.backend.Auth.CustomException.Otp.InvalidOtpException;
 import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
 import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
+import com.backend.backend.Auth.Service.AsyncMailRunner;
 import com.backend.backend.Auth.Service.EmailService;
 import com.backend.backend.Auth.Service.OtpService;
 import com.backend.backend.Custom.RateLimiter;
 import com.backend.backend.Transaction.CustomException.InvalidTransactionException;
-import com.backend.backend.Transaction.CustomException.MailSendFailedException;
 import com.backend.backend.Transaction.CustomException.NotUserTransaction;
 
 import lombok.RequiredArgsConstructor;
@@ -43,6 +42,7 @@ public class OtpTransactionService {
     private final EmailService emailService;
     private final RateLimiter rateLimiter;
     private final TransactionService transactionService;
+    private final AsyncMailRunner asyncMailRunner;
 
     private static final String OTP_INVALID_MSG = "Otp đã hết hạn hoặc không hợp lệ";
     private static final String TOKEN_INVALID_MSG = "Token đã hết hạn hoặc không hợp lệ";
@@ -99,16 +99,14 @@ public class OtpTransactionService {
                 otpService.hash(otp),
                 Duration.ofMinutes(otpTtlMinutes),
                 otpFailKey(transaction.getReferenceId(), email));
-        try {
-            emailService.sendTransactionOtp(email, otp, otpTtlMinutes, transaction);
-        } catch (MailException e) {
-            String refundKey = refundKey(transaction.getReferenceId(), email);
-            if (rateLimiter.hit(refundKey, resendLockHours * 3600L, 3) <= 3) { // tối đa 3 lần hoàn mỗi 24 giờ
-                rateLimiter.refund(resendKey(transaction.getReferenceId(), email));
-            }
-            throw new MailSendFailedException( // Vẫn có thể ném exception dù đã gửi mail thành công
-                    "Chưa xác nhận được việc gửi email. Nếu bạn đã nhận được mã thì cứ nhập, nếu chưa thì hãy yêu cầu gửi lại");
-        }
+
+        asyncMailRunner.run(() -> emailService.sendTransactionOtp(email, otp, otpTtlMinutes, transaction),
+                e -> {
+                    String refundKey = refundKey(transaction.getReferenceId(), email);
+                    if (rateLimiter.hit(refundKey, resendLockHours * 3600L, 3) <= 3) { // tối đa 3 lần hoàn mỗi 24 giờ
+                        rateLimiter.refund(resendKey(transaction.getReferenceId(), email));
+                    }
+                });
     }
 
     public String verifyTransactionOtp(Transaction transaction, String email, String rawOtp) {

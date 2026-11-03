@@ -75,8 +75,6 @@ public class AuthService {
     }
 
     public void resendVerificationCode(String email) {
-        emailVerificationService.enforceResendRateLimit(email);
-
         User user = authRepository.findUserByEmail(email).orElse(null);
         if (user == null || (user.getIsVerified() != null && user.getIsVerified() >= 1) || !user.isAccountNonLocked()) {
             throw new InvalidVerifyRequestException("Email không tồn tại, bị khoá hoặc đã được xác thực");

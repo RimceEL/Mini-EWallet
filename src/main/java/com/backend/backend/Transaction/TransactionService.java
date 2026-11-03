@@ -40,8 +40,6 @@ public class TransactionService {
         validate(transaction);
         precheck(transaction);
 
-        System.out.println(transaction);
-
         try {
             transactionRepository.transactionRecord(transaction);
         } catch (DuplicateKeyException e) {

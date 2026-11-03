@@ -11,7 +11,6 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.mail.MailException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +22,6 @@ import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
 import com.backend.backend.Auth.Model.User;
 import com.backend.backend.Auth.Repository.AuthRepository;
 import com.backend.backend.Custom.RateLimiter;
-import com.backend.backend.Transaction.CustomException.MailSendFailedException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -47,6 +45,7 @@ public class PasswordResetService {
     private final RefreshTokenService refreshTokenService;
     private final LoginAttemptService loginAttemptService;
     private final RateLimiter rateLimiter;
+    private final AsyncMailRunner asyncMailRunner;
 
     @Value("${app.password-reset.resend.max-attempts:5}")
     private int maxResendAttempts;
@@ -76,16 +75,13 @@ public class PasswordResetService {
                 otpService.hash(otp),
                 Duration.ofMinutes(otpTtlMinutes),
                 OTP_FAIL_PREFIX + email);
-        try {
-            emailService.sendPasswordResetOtp(email, otp, otpTtlMinutes);
-        } catch (MailException e) {
-            String refundKey = REFUND_PREFIX + email;
-            if (rateLimiter.hit(refundKey, 24 * 3600L, 3) <= 3) { // tối đa 3 lần hoàn mỗi 24 giờ
-                rateLimiter.refund(key);
-            }
-            throw new MailSendFailedException( // Vẫn có thể ném exception dù đã gửi mail thành công
-                    "Chưa xác nhận được việc gửi email. Nếu bạn đã nhận được mã thì cứ nhập, nếu chưa thì hãy yêu cầu gửi lại");
-        }
+        asyncMailRunner.run(() -> emailService.sendPasswordResetOtp(email, otp, otpTtlMinutes),
+                e -> {
+                    String refundKey = REFUND_PREFIX + email;
+                    if (rateLimiter.hit(refundKey, 24 * 3600L, 3) <= 3) { // tối đa 3 lần hoàn mỗi 24 giờ
+                        rateLimiter.refund(key);
+                    }
+                });
     }
 
     /**

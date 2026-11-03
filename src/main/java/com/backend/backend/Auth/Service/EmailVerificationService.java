@@ -23,6 +23,7 @@ public class EmailVerificationService {
     private final EmailService emailService;
     private static final SecureRandom secureRandom = new SecureRandom();
     private final RateLimiter rateLimiter;
+    private final AsyncMailRunner asyncMailRunner;
 
     @Value("${app.verification.expiration-minutes:10}")
     private long expirationMinutes;
@@ -48,7 +49,11 @@ public class EmailVerificationService {
         return "email_verify:resend:attempts:" + email;
     }
 
-    public void enforceResendRateLimit(String email) {
+    private String refundAttemptsKey(String email) {
+        return "email_verify:refund:attempts:" + email;
+    }
+
+    private void enforceResendRateLimit(String email) {
         String resendAttemptsKey = resendAttemptsKey(email);
         Long attempts = rateLimiter.hit(resendAttemptsKey, expirationCodeResendMinutes * 60L, maxResendAttemps);
         if (attempts > maxResendAttemps) {
@@ -59,9 +64,17 @@ public class EmailVerificationService {
     }
 
     public void generateAndSend(String email) {
+        enforceResendRateLimit(email);
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));
         rateLimiter.setExAndDelete(codeKey(email), code, Duration.ofMinutes(expirationMinutes), attemptsKey(email));
-        emailService.sendVerificationCode(email, code);
+        asyncMailRunner.run(() -> emailService.sendVerificationCode(email, code),
+                e -> {
+                    String refundKey = refundAttemptsKey(email);
+                    if (rateLimiter.hit(refundKey, 24 * 3600L, 3) <= 3) { // tối đa 3 lần hoàn mỗi 24 giờ
+                        rateLimiter.refund(resendAttemptsKey(email));
+                    }
+                });
+
     }
 
     public void verify(String email, String inputCode) {
