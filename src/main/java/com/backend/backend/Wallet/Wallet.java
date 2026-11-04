@@ -19,4 +19,5 @@ public class Wallet {
     private Integer version;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer pending;
 }

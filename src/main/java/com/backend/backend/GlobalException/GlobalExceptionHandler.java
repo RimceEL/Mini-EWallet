@@ -31,6 +31,7 @@ import com.backend.backend.Auth.CustomException.Token.RefreshTokenIsUsedExceptio
 import com.backend.backend.Auth.CustomException.Token.RevokingException;
 import com.backend.backend.DTO.ErrorResponse;
 import com.backend.backend.Transaction.CustomException.DuplicateTransactionException;
+import com.backend.backend.Transaction.CustomException.ExceedPendingException;
 import com.backend.backend.Transaction.CustomException.InvalidTransactionException;
 import com.backend.backend.Transaction.CustomException.MailSendFailedException;
 import com.backend.backend.Transaction.CustomException.NotEnoughAmountException;
@@ -97,7 +98,8 @@ public class GlobalExceptionHandler {
             TooManyVerificationAttemptsException.class,
             TooManyResendAttemptsException.class,
             LoginLockedException.class,
-            ManyOtpException.class })
+            ManyOtpException.class,
+            ExceedPendingException.class })
     public ResponseEntity<ErrorResponse> handleTooManyRequests(Exception ex, HttpServletRequest request) {
         return buildError(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
     }

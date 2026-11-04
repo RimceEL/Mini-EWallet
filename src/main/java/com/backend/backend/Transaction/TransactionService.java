@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.backend.backend.Transaction.CustomException.DuplicateTransactionException;
+import com.backend.backend.Transaction.CustomException.ExceedPendingException;
 import com.backend.backend.Transaction.CustomException.InvalidTransactionException;
 import com.backend.backend.Transaction.CustomException.NotEnoughAmountException;
 import com.backend.backend.Transaction.CustomException.TransactionError;
@@ -18,9 +19,11 @@ import com.backend.backend.Transaction.CustomException.TransactionRecordError;
 import com.backend.backend.Transaction.DTO.TransactionRequest;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TransactionService {
 
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("10000000000");
@@ -39,16 +42,21 @@ public class TransactionService {
     public void transactionRecord(Transaction transaction) {
         validate(transaction);
         precheck(transaction);
-
         try {
-            transactionRepository.transactionRecord(transaction);
+            if (!transactionRepository.increasePending(transaction.getSourceWalletId()))
+                throw new ExceedPendingException("Vượt ngưỡng giao dịch được phép treo cho phép");
+            if (!transactionRepository.transactionRecord(transaction)) {
+                throw new TransactionError("");
+            }
+        } catch (ExceedPendingException e) {
+            throw e;
         } catch (DuplicateKeyException e) {
             throw new DuplicateTransactionException(
                     "Giao dịch đã tồn tại: " + transaction.getReferenceId());
         } catch (DataIntegrityViolationException e) {
             throw new InvalidTransactionException(
                     "Dữ liệu giao dịch không hợp lệ hoặc ví không tồn tại");
-        } catch (DataAccessException e) {
+        } catch (DataAccessException | TransactionError e) {
             e.printStackTrace();
             throw new TransactionRecordError("Không thể ghi giao dịch, vui lòng thử lại sau");
         }
@@ -73,6 +81,8 @@ public class TransactionService {
         };
         if (!result)
             throw new TransactionError("Giao dịch thực hiện không thành công");
+        else if (!transactionRepository.decreasePending(transaction.getSourceWalletId()))
+            log.warn("Wallet với id: " + transaction.getSourceWalletId() + " đang có pending count <= 0");
     }
 
     public Transaction toTransaction(TransactionRequest request) {

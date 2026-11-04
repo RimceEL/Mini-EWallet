@@ -1,13 +1,17 @@
 package com.backend.backend.Transaction;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 
@@ -65,6 +69,24 @@ public class TransactionRepository {
         return resDebit && resCredit;
     }
 
+    public boolean increasePending(String walletId) throws DataAccessException {
+        String sql = """
+                    UPDATE wallets
+                    SET pending = pending + 1
+                    WHERE pending < 5 AND id = ?
+                """;
+        return jdbcTemplate.update(sql, walletId) > 0;
+    }
+
+    public boolean decreasePending(String walletId) throws DataAccessException {
+        String sql = """
+                    UPDATE wallets
+                    SET pending = pending - 1
+                    WHERE pending > 0 AND id = ?
+                """;
+        return jdbcTemplate.update(sql, walletId) > 0;
+    }
+
     public boolean transactionRecord(Transaction transaction) throws DataAccessException {
         String sql = """
                 INSERT INTO transactions
@@ -105,13 +127,45 @@ public class TransactionRepository {
         return c != null && c > 0;
     }
 
+    @Transactional
     public int expirePending(int minutes) {
+        List<ExpiredTx> expired = lockExpiredPending(minutes);
+        Map<String, Integer> perWallet = new TreeMap<>();
+        for (ExpiredTx tx : expired) {
+            if (markFailed(tx.id())) {
+                perWallet.merge(tx.walletId(), 1, Integer::sum);
+            }
+        }
+
+        perWallet.forEach((walletId, count) -> decreasePendingBy(walletId, count));
+        return expired.size();
+    }
+
+    public record ExpiredTx(String id, String walletId) {
+    }
+
+    public List<ExpiredTx> lockExpiredPending(int minutes) {
         String sql = """
-                UPDATE transactions
-                SET status = 'FAILED'
-                WHERE status = 'PENDING' AND created_at < NOW() - INTERVAL ? MINUTE
+                SELECT id, source_wallet_id
+                FROM transactions
+                WHERE status = 'PENDING'
+                  AND created_at < NOW() - INTERVAL ? MINUTE
+                ORDER BY created_at
+                FOR UPDATE SKIP LOCKED
                 """;
-        return jdbcTemplate.update(sql, minutes);
+        return jdbcTemplate.query(sql,
+                (rs, i) -> new ExpiredTx(rs.getString("id"), rs.getString("source_wallet_id")),
+                minutes);
+    }
+
+    public boolean markFailed(String txnId) {
+        String sql = "UPDATE transactions SET status = 'FAILED' WHERE id = ? AND status = 'PENDING'";
+        return jdbcTemplate.update(sql, txnId) > 0;
+    }
+
+    public void decreasePendingBy(String walletId, int n) {
+        String sql = "UPDATE wallets SET pending = GREATEST(pending - ?, 0) WHERE id = ?";
+        jdbcTemplate.update(sql, n, walletId);
     }
 
 }
