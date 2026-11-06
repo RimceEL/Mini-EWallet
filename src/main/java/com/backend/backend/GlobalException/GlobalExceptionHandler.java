@@ -39,6 +39,7 @@ import com.backend.backend.Transaction.CustomException.NotUserTransaction;
 import com.backend.backend.Transaction.CustomException.TransactionError;
 import com.backend.backend.Transaction.CustomException.TransactionNotFound;
 import com.backend.backend.Transaction.CustomException.TransactionRecordError;
+import com.backend.backend.Wallet.CustomException.WalletNotFoundException;
 import com.backend.backend.Wallet.CustomException.WalletOpenedException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,7 +53,7 @@ public class GlobalExceptionHandler {
     }
 
     // 404
-    @ExceptionHandler({ UsernameNotFoundException.class, TransactionNotFound.class })
+    @ExceptionHandler({ UsernameNotFoundException.class, TransactionNotFound.class, WalletNotFoundException.class })
     public ResponseEntity<ErrorResponse> handleNotFound(Exception ex, HttpServletRequest request) {
         return buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
