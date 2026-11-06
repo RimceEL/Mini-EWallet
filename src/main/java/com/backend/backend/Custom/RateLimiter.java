@@ -1,17 +1,12 @@
-package com.backend.backend.Custom;
+package com.backend.backend.custom;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.expression.ExpressionParser;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -19,8 +14,6 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class RateLimiter {
-    private static final ExpressionParser PARSER = new SpelExpressionParser();
-
     private final StringRedisTemplate redis;
 
     private static final DefaultRedisScript<Long> HIT = new DefaultRedisScript<>("""

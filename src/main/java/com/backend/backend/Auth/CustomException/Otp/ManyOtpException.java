@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.CustomException.Otp;
+package com.backend.backend.auth.customexception.otp;
 
 public class ManyOtpException extends RuntimeException {
 

@@ -1,4 +1,4 @@
-package com.backend.backend.Transaction.CustomException;
+package com.backend.backend.transaction.customexception;
 
 public class InvalidTransactionException extends RuntimeException {
 

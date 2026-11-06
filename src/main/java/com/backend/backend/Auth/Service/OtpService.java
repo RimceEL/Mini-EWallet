@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Service;
+package com.backend.backend.auth.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;

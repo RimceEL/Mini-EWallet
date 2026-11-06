@@ -1,4 +1,4 @@
-package com.backend.backend.Transaction;
+package com.backend.backend.transaction;
 
 import java.math.BigDecimal;
 import java.util.List;

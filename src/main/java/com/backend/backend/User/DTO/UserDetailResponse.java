@@ -1,6 +1,6 @@
-package com.backend.backend.User.DTO;
+package com.backend.backend.user.dto;
 
-import com.backend.backend.Auth.Model.Role;
+import com.backend.backend.auth.model.Role;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

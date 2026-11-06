@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.EntryPoint;
+package com.backend.backend.auth.entrypoint;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

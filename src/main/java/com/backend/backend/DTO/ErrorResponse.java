@@ -1,4 +1,4 @@
-package com.backend.backend.DTO;
+package com.backend.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;

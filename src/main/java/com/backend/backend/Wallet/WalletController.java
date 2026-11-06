@@ -1,11 +1,11 @@
-package com.backend.backend.Wallet;
+package com.backend.backend.wallet;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.backend.backend.Auth.Model.User;
-import com.backend.backend.DTO.ApiResponse;
-import com.backend.backend.Wallet.DTO.WalletDetailResponse;
+import com.backend.backend.auth.model.User;
+import com.backend.backend.dto.ApiResponse;
+import com.backend.backend.wallet.dto.WalletDetailResponse;
 
 import lombok.RequiredArgsConstructor;
 

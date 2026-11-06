@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.CustomException.Authentication;
+package com.backend.backend.auth.customexception.authentication;
 
 public class UserExistedException extends RuntimeException {
     public UserExistedException(String message) {

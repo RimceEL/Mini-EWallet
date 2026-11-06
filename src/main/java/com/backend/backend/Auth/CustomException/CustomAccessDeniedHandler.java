@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.CustomException;
+package com.backend.backend.auth.customexception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

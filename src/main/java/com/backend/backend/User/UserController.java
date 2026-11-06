@@ -1,11 +1,11 @@
-package com.backend.backend.User;
+package com.backend.backend.user;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.backend.backend.Auth.Model.User;
-import com.backend.backend.DTO.ApiResponse;
-import com.backend.backend.User.DTO.UserDetailResponse;
+import com.backend.backend.auth.model.User;
+import com.backend.backend.dto.ApiResponse;
+import com.backend.backend.user.dto.UserDetailResponse;
 
 import lombok.RequiredArgsConstructor;
 

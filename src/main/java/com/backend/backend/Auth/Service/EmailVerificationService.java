@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Service;
+package com.backend.backend.auth.service;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -7,11 +7,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.Email.ExpiredVerificationCodeException;
-import com.backend.backend.Auth.CustomException.Email.InvalidVerificationCodeException;
-import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
-import com.backend.backend.Auth.CustomException.Email.TooManyVerificationAttemptsException;
-import com.backend.backend.Custom.RateLimiter;
+import com.backend.backend.auth.customexception.email.ExpiredVerificationCodeException;
+import com.backend.backend.auth.customexception.email.InvalidVerificationCodeException;
+import com.backend.backend.auth.customexception.email.TooManyResendAttemptsException;
+import com.backend.backend.auth.customexception.email.TooManyVerificationAttemptsException;
+import com.backend.backend.custom.RateLimiter;
 
 import lombok.RequiredArgsConstructor;
 

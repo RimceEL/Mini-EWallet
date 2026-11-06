@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.DTO;
+package com.backend.backend.auth.dto;
 
 import lombok.Builder;
 import lombok.Getter;

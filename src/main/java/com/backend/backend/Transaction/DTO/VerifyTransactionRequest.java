@@ -1,4 +1,4 @@
-package com.backend.backend.Transaction.DTO;
+package com.backend.backend.transaction.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

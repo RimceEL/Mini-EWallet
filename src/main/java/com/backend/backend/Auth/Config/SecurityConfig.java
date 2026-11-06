@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Config;
+package com.backend.backend.auth.config;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,10 +23,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import com.backend.backend.Auth.CustomException.CustomAccessDeniedHandler;
-import com.backend.backend.Auth.EntryPoint.JwtAuthenticationEntryPoint;
-import com.backend.backend.Auth.Filter.JwtAuthenticationFilter;
-import com.backend.backend.Auth.Service.MyUserDetailsService;
+import com.backend.backend.auth.service.MyUserDetailsService;
+import com.backend.backend.auth.customexception.CustomAccessDeniedHandler;
+import com.backend.backend.auth.entrypoint.JwtAuthenticationEntryPoint;
+import com.backend.backend.auth.filter.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity

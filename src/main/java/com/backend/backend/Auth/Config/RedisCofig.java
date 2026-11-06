@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Config;
+package com.backend.backend.auth.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -18,8 +18,7 @@ public class RedisCofig {
             @Value("${spring.data.redis.host}") String host,
             @Value("${spring.data.redis.port}") int port,
             @Value("${spring.data.redis.password}") String password,
-            @Value("${spring.data.redis.username}") String username
-        ) {
+            @Value("${spring.data.redis.username}") String username) {
 
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, port);
         config.setPassword(RedisPassword.of(password));

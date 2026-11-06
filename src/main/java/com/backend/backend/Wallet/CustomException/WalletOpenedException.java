@@ -1,4 +1,4 @@
-package com.backend.backend.Wallet.CustomException;
+package com.backend.backend.wallet.customexception;
 
 public class WalletOpenedException extends RuntimeException {
 

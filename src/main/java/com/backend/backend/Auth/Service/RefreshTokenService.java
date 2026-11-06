@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Service;
+package com.backend.backend.auth.service;
 
 import java.time.Duration;
 import java.util.Set;
@@ -8,8 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
-import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
+import com.backend.backend.auth.customexception.authentication.UnloginException;
+import com.backend.backend.auth.customexception.token.ExpiredRefreshTokenException;
 
 import lombok.RequiredArgsConstructor;
 

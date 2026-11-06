@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Repository;
+package com.backend.backend.auth.repository;
 
 import java.util.List;
 import java.util.Optional;
@@ -9,8 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import com.backend.backend.Auth.DTO.RegisterRequest;
-import com.backend.backend.Auth.Model.User;
+import com.backend.backend.auth.dto.RegisterRequest;
+import com.backend.backend.auth.model.User;
 
 import lombok.RequiredArgsConstructor;
 

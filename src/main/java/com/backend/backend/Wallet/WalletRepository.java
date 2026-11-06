@@ -1,4 +1,4 @@
-package com.backend.backend.Wallet;
+package com.backend.backend.wallet;
 
 import java.util.Optional;
 

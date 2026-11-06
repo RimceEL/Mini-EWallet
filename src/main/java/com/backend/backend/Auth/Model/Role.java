@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Model;
+package com.backend.backend.auth.model;
 
 public enum Role {
     USER,

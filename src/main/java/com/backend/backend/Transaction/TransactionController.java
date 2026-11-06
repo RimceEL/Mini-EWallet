@@ -1,19 +1,19 @@
-package com.backend.backend.Transaction;
+package com.backend.backend.transaction;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.backend.backend.Auth.Model.User;
-import com.backend.backend.DTO.ApiResponse;
-import com.backend.backend.Transaction.DTO.SendOtpRequest;
-import com.backend.backend.Transaction.DTO.TopUpRequest;
-import com.backend.backend.Transaction.DTO.TransactionRequest;
-import com.backend.backend.Transaction.DTO.TransactionResponse;
-import com.backend.backend.Transaction.DTO.TransferRequest;
-import com.backend.backend.Transaction.DTO.VerifyOtpRequest;
-import com.backend.backend.Transaction.DTO.VerifyTransactionRequest;
-import com.backend.backend.Transaction.DTO.WithdrawRequest;
-import com.backend.backend.Wallet.WalletService;
+import com.backend.backend.auth.model.User;
+import com.backend.backend.dto.ApiResponse;
+import com.backend.backend.transaction.dto.SendOtpRequest;
+import com.backend.backend.transaction.dto.TopUpRequest;
+import com.backend.backend.transaction.dto.TransactionRequest;
+import com.backend.backend.transaction.dto.TransactionResponse;
+import com.backend.backend.transaction.dto.TransferRequest;
+import com.backend.backend.transaction.dto.VerifyOtpRequest;
+import com.backend.backend.transaction.dto.VerifyTransactionRequest;
+import com.backend.backend.transaction.dto.WithdrawRequest;
+import com.backend.backend.wallet.WalletService;
 
 import lombok.RequiredArgsConstructor;
 

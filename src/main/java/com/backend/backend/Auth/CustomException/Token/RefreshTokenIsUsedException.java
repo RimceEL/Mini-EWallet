@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.CustomException.Token;
+package com.backend.backend.auth.customexception.token;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.AuthenticationException;

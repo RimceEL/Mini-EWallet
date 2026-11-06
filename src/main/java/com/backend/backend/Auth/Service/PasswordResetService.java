@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Service;
+package com.backend.backend.auth.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -14,14 +14,14 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
-import com.backend.backend.Auth.CustomException.Email.TooManyResendAttemptsException;
-import com.backend.backend.Auth.CustomException.Otp.InvalidOtpException;
-import com.backend.backend.Auth.CustomException.Otp.InvalidResetTokenException;
-import com.backend.backend.Auth.CustomException.Otp.ManyOtpException;
-import com.backend.backend.Auth.Model.User;
-import com.backend.backend.Auth.Repository.AuthRepository;
-import com.backend.backend.Custom.RateLimiter;
+import com.backend.backend.auth.model.User;
+import com.backend.backend.auth.repository.AuthRepository;
+import com.backend.backend.auth.customexception.authentication.InvalidRegisterRequest;
+import com.backend.backend.auth.customexception.email.TooManyResendAttemptsException;
+import com.backend.backend.auth.customexception.otp.InvalidOtpException;
+import com.backend.backend.auth.customexception.otp.InvalidResetTokenException;
+import com.backend.backend.auth.customexception.otp.ManyOtpException;
+import com.backend.backend.custom.RateLimiter;
 
 import lombok.RequiredArgsConstructor;
 

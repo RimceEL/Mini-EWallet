@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Service;
+package com.backend.backend.auth.service;
 
 import java.time.Duration;
 import java.util.List;
@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Custom.RateLimiter;
+import com.backend.backend.custom.RateLimiter;
 
 import lombok.RequiredArgsConstructor;
 

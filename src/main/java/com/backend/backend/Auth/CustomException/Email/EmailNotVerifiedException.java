@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.CustomException.Email;
+package com.backend.backend.auth.customexception.email;
 
 public class EmailNotVerifiedException extends RuntimeException {
     public EmailNotVerifiedException(String message) {

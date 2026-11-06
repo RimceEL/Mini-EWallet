@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Filter;
+package com.backend.backend.auth.filter;
 
 import java.io.IOException;
 import java.util.List;
@@ -11,9 +11,9 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.backend.backend.Auth.Service.JwtService;
-import com.backend.backend.Auth.Service.MyUserDetailsService;
-import com.backend.backend.Auth.Service.RefreshTokenService;
+import com.backend.backend.auth.service.JwtService;
+import com.backend.backend.auth.service.MyUserDetailsService;
+import com.backend.backend.auth.service.RefreshTokenService;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;

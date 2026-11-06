@@ -1,4 +1,4 @@
-package com.backend.backend.Wallet.DTO;
+package com.backend.backend.wallet.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

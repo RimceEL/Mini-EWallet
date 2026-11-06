@@ -1,4 +1,4 @@
-package com.backend.backend.Auth.Service;
+package com.backend.backend.auth.service;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -8,14 +8,14 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Auth.CustomException.Authentication.InvalidRegisterRequest;
-import com.backend.backend.Auth.CustomException.Authentication.LoginLockedException;
-import com.backend.backend.Auth.CustomException.Authentication.UserExistedException;
-import com.backend.backend.Auth.CustomException.Email.InvalidVerifyRequestException;
-import com.backend.backend.Auth.DTO.LoginRequest;
-import com.backend.backend.Auth.DTO.RegisterRequest;
-import com.backend.backend.Auth.Model.User;
-import com.backend.backend.Auth.Repository.AuthRepository;
+import com.backend.backend.auth.customexception.authentication.InvalidRegisterRequest;
+import com.backend.backend.auth.customexception.authentication.LoginLockedException;
+import com.backend.backend.auth.customexception.authentication.UserExistedException;
+import com.backend.backend.auth.customexception.email.InvalidVerifyRequestException;
+import com.backend.backend.auth.dto.LoginRequest;
+import com.backend.backend.auth.dto.RegisterRequest;
+import com.backend.backend.auth.model.User;
+import com.backend.backend.auth.repository.AuthRepository;
 
 import lombok.RequiredArgsConstructor;
 

@@ -1,12 +1,12 @@
-package com.backend.backend.Wallet;
+package com.backend.backend.wallet;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.Wallet.CustomException.UserNotFoundException;
-import com.backend.backend.Wallet.CustomException.WalletNotFoundException;
-import com.backend.backend.Wallet.CustomException.WalletOpenedException;
+import com.backend.backend.wallet.customexception.UserNotFoundException;
+import com.backend.backend.wallet.customexception.WalletNotFoundException;
+import com.backend.backend.wallet.customexception.WalletOpenedException;
 
 import lombok.RequiredArgsConstructor;
 

@@ -1,6 +1,6 @@
-package com.backend.backend.Auth.DTO;
+package com.backend.backend.auth.dto;
 
-import com.backend.backend.Auth.Model.Role;
+import com.backend.backend.auth.model.Role;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

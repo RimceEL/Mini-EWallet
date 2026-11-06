@@ -1,11 +1,11 @@
-package com.backend.backend.Transaction.DTO;
+package com.backend.backend.transaction.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import com.backend.backend.Transaction.Transaction;
-import com.backend.backend.Transaction.TransactionStatus;
-import com.backend.backend.Transaction.TransactionType;
+import com.backend.backend.transaction.Transaction;
+import com.backend.backend.transaction.TransactionStatus;
+import com.backend.backend.transaction.TransactionType;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

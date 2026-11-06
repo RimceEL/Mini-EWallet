@@ -1,26 +1,26 @@
-package com.backend.backend.Auth.Controller;
+package com.backend.backend.auth.controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
-import com.backend.backend.Auth.CustomException.Authentication.UnloginException;
-import com.backend.backend.Auth.CustomException.Token.ExpiredRefreshTokenException;
-import com.backend.backend.Auth.CustomException.Token.InvalidRefreshToken;
-import com.backend.backend.Auth.CustomException.Token.RefreshTokenIsUsedException;
-import com.backend.backend.Auth.CustomException.Token.RevokingException;
-import com.backend.backend.Auth.DTO.LoginRequest;
-import com.backend.backend.Auth.DTO.LoginResponse;
-import com.backend.backend.Auth.DTO.OtpVerifyResponse;
-import com.backend.backend.Auth.DTO.RefreshTokenRequest;
-import com.backend.backend.Auth.DTO.RegisterRequest;
-import com.backend.backend.Auth.DTO.ResendVerificationRequest;
-import com.backend.backend.Auth.DTO.ResetPasswordRequest;
-import com.backend.backend.Auth.DTO.VerifyEmailRequest;
-import com.backend.backend.Auth.Model.User;
-import com.backend.backend.Auth.Service.AuthService;
-import com.backend.backend.Auth.Service.JwtService;
-import com.backend.backend.Auth.Service.PasswordResetService;
-import com.backend.backend.Auth.Service.RefreshTokenService;
-import com.backend.backend.DTO.ApiResponse;
+import com.backend.backend.auth.customexception.authentication.UnloginException;
+import com.backend.backend.auth.customexception.token.ExpiredRefreshTokenException;
+import com.backend.backend.auth.customexception.token.InvalidRefreshToken;
+import com.backend.backend.auth.customexception.token.RefreshTokenIsUsedException;
+import com.backend.backend.auth.customexception.token.RevokingException;
+import com.backend.backend.auth.dto.LoginRequest;
+import com.backend.backend.auth.dto.LoginResponse;
+import com.backend.backend.auth.dto.OtpVerifyResponse;
+import com.backend.backend.auth.dto.RefreshTokenRequest;
+import com.backend.backend.auth.dto.RegisterRequest;
+import com.backend.backend.auth.dto.ResendVerificationRequest;
+import com.backend.backend.auth.dto.ResetPasswordRequest;
+import com.backend.backend.auth.dto.VerifyEmailRequest;
+import com.backend.backend.auth.model.User;
+import com.backend.backend.auth.service.AuthService;
+import com.backend.backend.auth.service.JwtService;
+import com.backend.backend.auth.service.PasswordResetService;
+import com.backend.backend.auth.service.RefreshTokenService;
+import com.backend.backend.dto.ApiResponse;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
