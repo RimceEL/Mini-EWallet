@@ -1,4 +1,4 @@
-package com.backend.backend.auth.service;
+package com.backend.backend.global;
 
 import java.util.regex.Pattern;
 

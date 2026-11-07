@@ -16,6 +16,7 @@ import com.backend.backend.auth.dto.LoginRequest;
 import com.backend.backend.auth.dto.RegisterRequest;
 import com.backend.backend.auth.model.User;
 import com.backend.backend.auth.repository.AuthRepository;
+import com.backend.backend.global.ValidationUtils;
 
 import lombok.RequiredArgsConstructor;
 

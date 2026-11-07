@@ -22,6 +22,7 @@ import com.backend.backend.auth.customexception.otp.InvalidOtpException;
 import com.backend.backend.auth.customexception.otp.InvalidResetTokenException;
 import com.backend.backend.auth.customexception.otp.ManyOtpException;
 import com.backend.backend.custom.RateLimiter;
+import com.backend.backend.global.ValidationUtils;
 
 import lombok.RequiredArgsConstructor;
 

@@ -57,7 +57,7 @@ public class TransactionService {
             throw new InvalidTransactionException(
                     "Dữ liệu giao dịch không hợp lệ hoặc ví không tồn tại");
         } catch (DataAccessException | TransactionError e) {
-            e.printStackTrace();
+            log.error("Không thể ghi giao dịch {}", transaction.getReferenceId(), e.getMessage());
             throw new TransactionRecordError("Không thể ghi giao dịch, vui lòng thử lại sau");
         }
     }

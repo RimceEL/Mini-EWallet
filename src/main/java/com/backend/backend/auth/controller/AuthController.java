@@ -21,6 +21,7 @@ import com.backend.backend.auth.service.JwtService;
 import com.backend.backend.auth.service.PasswordResetService;
 import com.backend.backend.auth.service.RefreshTokenService;
 import com.backend.backend.dto.ApiResponse;
+import com.backend.backend.global.DataNormalizer;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -45,6 +46,7 @@ public class AuthController {
 
     @PostMapping("/auth/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
+        request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
         User user = authService.login(request);
         String jti = UUID.randomUUID().toString();
         String accessToken = jwtService.accessTokenGenerate(user, jti);
@@ -62,6 +64,7 @@ public class AuthController {
 
     @PostMapping("/auth/register")
     public ApiResponse<String> register(@RequestBody RegisterRequest request) {
+        request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
         authService.register(request);
         return new ApiResponse<String>(0, "Register successfully", "");
     }
@@ -126,24 +129,28 @@ public class AuthController {
 
     @PostMapping("/auth/verify-email")
     public ApiResponse<String> verifyEmail(@RequestBody VerifyEmailRequest request) {
+        request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
         authService.verifyEmail(request.getEmail(), request.getCode());
         return new ApiResponse<String>(0, "Xác thực email thành công", "");
     }
 
     @PostMapping("/auth/resend-verification")
     public ApiResponse<String> resendVerification(@RequestBody ResendVerificationRequest request) {
+        request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
         authService.resendVerificationCode(request.getEmail());
         return new ApiResponse<String>(0, "Đã gửi lại mã xác thực", "");
     }
 
     @PostMapping("/auth/otp-reset-request")
     public ApiResponse<String> otpResetRequest(@RequestBody ResendVerificationRequest request) {
+        request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
         passwordResetService.requestReset(request.getEmail());
         return new ApiResponse<String>(0, "Đã gửi lại mã OTP", "");
     }
 
     @PostMapping("/auth/otp-reset-verify")
     public ApiResponse<OtpVerifyResponse> otpResetVerify(@RequestBody VerifyEmailRequest request) {
+        request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
         String token = passwordResetService.verifyOtp(request.getEmail(), request.getCode());
         OtpVerifyResponse response = OtpVerifyResponse.builder().token(token).build();
         return new ApiResponse<OtpVerifyResponse>(0, "xác thực OTP thành công", response);
@@ -151,6 +158,7 @@ public class AuthController {
 
     @PostMapping("/auth/otp-reset-password")
     public ApiResponse<String> resetPassword(@RequestBody ResetPasswordRequest request) {
+        request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
         passwordResetService.resetPassword(request.getEmail(), request.getToken(), request.getNewPassword());
         return new ApiResponse<String>(0, "Đổi mật khẩu thành công", "");
     }

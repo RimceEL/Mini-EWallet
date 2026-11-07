@@ -25,9 +25,11 @@ import com.backend.backend.transaction.customexception.InvalidTransactionExcepti
 import com.backend.backend.transaction.customexception.NotUserTransaction;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OtpTransactionService {
     private static final String OTP_PREFIX = "transaction:otp:";
     private static final String TOKEN_PREFIX = "transaction:token:";
@@ -174,7 +176,7 @@ public class OtpTransactionService {
                     otpFailKey(transaction.getReferenceId(), email),
                     refundKey(transaction.getReferenceId(), email)));
         } catch (RuntimeException e) {
-            System.err.println("Không dọn được key Redis của giao dịch " + transaction.getReferenceId());
+            log.warn("Không dọn được key Redis của giao dịch {}", transaction.getReferenceId(), e);
         }
     }
 
