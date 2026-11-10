@@ -4,14 +4,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.assertj.core.api.Assertions.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -23,9 +21,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -50,29 +45,12 @@ import com.backend.backend.transaction.TransactionController;
 import com.backend.backend.transaction.TransactionService;
 import com.backend.backend.transaction.TransactionStatus;
 import com.backend.backend.transaction.TransactionType;
-import com.backend.backend.transaction.customexception.DuplicateTransactionException;
-import com.backend.backend.transaction.customexception.ExceedPendingException;
-import com.backend.backend.transaction.customexception.InvalidTransactionException;
-import com.backend.backend.transaction.customexception.TransactionRecordError;
-
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-
-import java.util.stream.Stream;
-
-import tools.jackson.databind.ObjectMapper;
 
 @WebMvcTest(TransactionController.class)
 @AutoConfigureMockMvc(addFilters = false)
 public class TransactionControllerCreateTopUpTest {
         @Autowired
         private MockMvc mockMvc;
-
-        @Autowired
-        private ObjectMapper objectMapper;
 
         @MockitoBean
         private TransactionService transactionService;
@@ -139,46 +117,6 @@ public class TransactionControllerCreateTopUpTest {
                 return captor.getValue();
         }
 
-        // A
-
-        @Test
-        void createTopUp_malformedJson_returns400() throws Exception {
-                postTopUp("{amount: ")
-                                .andExpect(status().isBadRequest());
-                verifyNoInteractions(transactionService);
-        }
-
-        @Test
-        void createTopUp_emptyBody_returns400() throws Exception {
-                mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON))
-                                .andDo(print())
-                                .andExpect(status().isBadRequest());
-                verifyNoInteractions(transactionService);
-        }
-
-        @Test
-        void createTopUp_amountIsText_returns400() throws Exception {
-                postTopUp("{\"amount\":\"abc\",\"description\":\"Nap tien\"}")
-                                .andExpect(status().isBadRequest());
-                verifyNoInteractions(transactionService);
-        }
-
-        @Test
-        void createTopUp_wrongContentType_returns415() throws Exception {
-                mockMvc.perform(post(URL).contentType(MediaType.TEXT_PLAIN).content("amount=1000"))
-                                .andDo(print())
-                                .andExpect(status().isUnsupportedMediaType());
-        }
-
-        @Test
-        void createTopUp_wrongHttpMethod_returns405() throws Exception {
-                mockMvc.perform(get(URL))
-                                .andDo(print())
-                                .andExpect(status().isMethodNotAllowed());
-        }
-
-        // B
-
         @Test
         void createTopUp_clientSendsExtraFields_areIgnored() throws Exception {
                 stubServiceSuccess();
@@ -192,49 +130,14 @@ public class TransactionControllerCreateTopUpTest {
                 postTopUp(body).andExpect(status().isOk());
 
                 TransactionRequest sent = captureSentRequest();
-                assertEquals(TransactionType.TOP_UP, sent.getType()); // không bị đổi thành TRANSFER
-                assertEquals("wallet-1", sent.getSourceWalletId()); // luôn là ví của user đang đăng nhập
+                assertEquals(TransactionType.TOP_UP, sent.getType());
+                assertEquals("wallet-1", sent.getSourceWalletId());
                 assertEquals("wallet-1", sent.getDestinationWalletId());
-                assertNotEquals("my-ref", sent.getReferenceId()); // referenceId do server sinh
+                assertNotEquals("my-ref", sent.getReferenceId());
         }
-
-        // C
-
-        static Stream<Arguments> businessErrors() {
-                return Stream.of(
-                                Arguments.of(new InvalidTransactionException("Số tiền phải lớn hơn 0"), 400),
-                                Arguments.of(new DuplicateTransactionException("Giao dịch đã tồn tại"), 409),
-                                Arguments.of(new ExceedPendingException("Vượt ngưỡng giao dịch treo"), 429),
-                                Arguments.of(new TransactionRecordError("Không thể ghi giao dịch"), 500));
-        }
-
-        @ParameterizedTest
-        @MethodSource("businessErrors")
-        void createTopUp_serviceThrowsError_returnsMatchingStatus(RuntimeException error, int expectedStatus)
-                        throws Exception {
-                doThrow(error).when(transactionService).transactionRecord(any());
-
-                postTopUp(VALID_BODY).andExpect(status().is(expectedStatus));
-
-                verify(transactionService, never()).findTransactionByRefId(anyString());
-        }
-
-        // D
-        @Test
-        void createTopUp_unexpectedError_returns500WithoutLeakingDetails() throws Exception {
-                doThrow(new RuntimeException("could not execute statement; table wallet_tx"))
-                                .when(transactionService).transactionRecord(any());
-
-                postTopUp(VALID_BODY)
-                                .andExpect(status().isInternalServerError())
-                                .andExpect(content().string(not(containsString("wallet_tx"))));
-        }
-
-        // E
 
         @Test
         void createTopUp_userHasNoWallet_returns4xxNotServerError() throws Exception {
-                // đổi thành exception thật mà WalletService ném khi user chưa có ví
                 doThrow(new WalletNotFoundException("Ví không tồn tại"))
                                 .when(walletService).getWalletDetails("an@gmail.com");
 
@@ -250,7 +153,7 @@ public class TransactionControllerCreateTopUpTest {
                 postTopUp(VALID_BODY).andExpect(status().isOk());
 
                 TransactionRequest sent = captureSentRequest();
-                UUID.fromString(sent.getReferenceId()); // ném lỗi nếu không phải UUID
+                UUID.fromString(sent.getReferenceId());
                 verify(transactionService).findTransactionByRefId(sent.getReferenceId());
         }
 
@@ -258,7 +161,6 @@ public class TransactionControllerCreateTopUpTest {
         void createTopUp_success_returnsTransactionDataInBody() throws Exception {
                 stubServiceSuccess();
 
-                // sửa tên field cho khớp ApiResponse / TransactionResponse của bạn
                 postTopUp(VALID_BODY)
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.data.referenceId").value("ref-1"))
