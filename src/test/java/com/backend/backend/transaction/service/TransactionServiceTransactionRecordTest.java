@@ -37,7 +37,7 @@ import com.backend.backend.transaction.customexception.NotEnoughAmountException;
 import com.backend.backend.transaction.customexception.TransactionRecordError;
 
 @ExtendWith(MockitoExtension.class)
-class TransactionServiceTest {
+class TransactionServiceTransactionRecordTest {
 
         private static final String SOURCE = "wallet-source";
         private static final String DEST = "wallet-dest";
