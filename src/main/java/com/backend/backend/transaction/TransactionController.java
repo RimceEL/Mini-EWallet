@@ -73,13 +73,13 @@ public class TransactionController {
     }
 
     @PostMapping("/user/transaction/execute")
-    public ApiResponse<Transaction> excecute(@AuthenticationPrincipal User user,
+    public ApiResponse<TransactionResponse> excecute(@AuthenticationPrincipal User user,
             @RequestBody VerifyTransactionRequest request) {
         Transaction transaction = transactionService.findTransactionByRefId(request.getReferenceId());
         String rawToken = request.getRawToken();
         otpTransactionService.verifyTransaction(transaction, user.getEmail(), rawToken);
         transaction = transactionService.findTransactionByRefId(transaction.getReferenceId());
-        return new ApiResponse<>(0, "Success", transaction);
+        return new ApiResponse<>(0, "Success", TransactionResponse.from(transaction));
     }
 
     private Transaction createPending(User user, TransactionType type, String destinationWalletId,

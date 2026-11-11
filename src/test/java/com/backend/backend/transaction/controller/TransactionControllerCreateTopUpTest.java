@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -166,6 +168,41 @@ public class TransactionControllerCreateTopUpTest {
                                 .andExpect(jsonPath("$.data.referenceId").value("ref-1"))
                                 .andExpect(jsonPath("$.data.type").value("TOP_UP"))
                                 .andExpect(jsonPath("$.data.status").value("PENDING"));
+
+        }
+
+        @Test
+        void createTopUp_recordsTransactionBeforeLookup() throws Exception {
+                stubServiceSuccess();
+
+                postTopUp(VALID_BODY).andExpect(status().isOk());
+
+                InOrder order = inOrder(transactionService);
+                order.verify(transactionService).toTransaction(any(TransactionRequest.class));
+                order.verify(transactionService).transactionRecord(any(Transaction.class));
+                order.verify(transactionService).findTransactionByRefId(anyString());
+        }
+
+        @Test
+        void createTopUp_malformedJson_returns400AndNoServiceCall() throws Exception {
+                postTopUp("{\"amount\":").andExpect(status().isBadRequest());
+
+                verifyNoInteractions(transactionService);
+        }
+
+        @Test
+        void createTopUp_emptyBody_returns400AndNoServiceCall() throws Exception {
+                postTopUp("").andExpect(status().isBadRequest());
+
+                verifyNoInteractions(transactionService);
+        }
+
+        @Test
+        void createTopUp_amountIsNotANumber_returns400AndNoServiceCall() throws Exception {
+                postTopUp("{\"amount\":\"abc\",\"description\":\"x\",\"destinationWalletId\":\"wallet-2\"}")
+                                .andExpect(status().isBadRequest());
+
+                verifyNoInteractions(transactionService);
         }
 
 }
