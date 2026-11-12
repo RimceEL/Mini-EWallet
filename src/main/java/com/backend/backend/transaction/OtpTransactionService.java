@@ -128,7 +128,7 @@ public class OtpTransactionService {
         Long fails = rateLimiter.hit(otpFailKey(transaction.getReferenceId(), email), otpTtlMinutes * 60L * 2L,
                 maxOtpAttempts);
 
-        if (fails != null && fails > maxOtpAttempts) {
+        if (fails > maxOtpAttempts) {
             redis.delete(otpKey);
             throw new ManyOtpException("Bạn đã nhập sai OTP quá nhiều lần, vui lòng yêu cầu cấp mã mới");
         }
