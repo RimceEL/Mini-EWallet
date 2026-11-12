@@ -30,7 +30,11 @@ public class RateLimiter {
 
     private static final DefaultRedisScript<Long> REFUND = new DefaultRedisScript<>("""
             if redis.call('EXISTS', KEYS[1]) == 1 then
-                return redis.call('DECR', KEYS[1])
+                local current = tonumber(redis.call('GET', KEYS[1])) or 0
+                if current > 0 then
+                    return redis.call('DECR', KEYS[1])
+                end
+                return current
             end
             return 0
             """, Long.class);
