@@ -41,7 +41,7 @@ public class TransactionRepository {
     public boolean credit(String walletId, BigDecimal amount) throws DataAccessException {
         String sql = """
                 UPDATE wallets w
-                SET w.balance = w.balance + ?, w.version = w.version + 1
+                SET w.balance = w.balance + ?
                 WHERE w.id = ? AND w.status = 'ACTIVE'
                 """;
         return jdbcTemplate.update(sql, amount, walletId) > 0;
@@ -50,7 +50,7 @@ public class TransactionRepository {
     public boolean debit(String walletId, BigDecimal amount) {
         String sql = """
                 UPDATE wallets w
-                SET w.balance = w.balance - ?, w.version = w.version + 1
+                SET w.balance = w.balance - ?
                 WHERE w.id = ? AND w.balance >= ? AND w.status = 'ACTIVE'
                 """;
         return jdbcTemplate.update(sql, amount, walletId, amount) > 0;
