@@ -133,11 +133,9 @@ class GlobalExceptionHandlerTest {
         return mockMvc.perform(get("/test/throw")).andDo(print());
     }
 
-    // =====================================================================
     // PHẦN 1: EXCEPTION TỰ ĐỊNH NGHĨA -> đúng status, trả đúng message
     // (giả định mọi exception đều có constructor nhận 1 String; class nào khác thì
     // sửa dòng đó)
-    // =====================================================================
 
     static Stream<Arguments> customExceptions() {
         return Stream.of(
@@ -188,10 +186,8 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
-    // =====================================================================
     // 401: AuthenticationException -> message cố định theo loại, không dùng message
     // gốc
-    // =====================================================================
 
     static Stream<Arguments> authenticationExceptions() {
         return Stream.of(
@@ -220,9 +216,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.message").value(expectedMessage));
     }
 
-    // =====================================================================
     // PHẦN 2: EXCEPTION CỦA SPRING -> đúng status, message cố định
-    // =====================================================================
 
     @Test
     void malformedJson_returns400() throws Exception {
@@ -312,9 +306,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.message").value("Kiểu dữ liệu không được hỗ trợ"));
     }
 
-    // =====================================================================
     // PHẦN 3: LỖI BẤT NGỜ -> 500, message chung, không lộ chi tiết
-    // =====================================================================
 
     static Stream<Arguments> unexpectedExceptions() {
         return Stream.of(
