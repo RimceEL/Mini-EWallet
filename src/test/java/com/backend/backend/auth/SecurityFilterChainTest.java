@@ -259,6 +259,7 @@ public class SecurityFilterChainTest {
         mockMvc.perform(get(ADMIN_URL).header("Authorization", "Bearer " + tampered))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("TOKEN_INVALID"));
+        verify(userDetailsService, never()).loadUserByUsername("admin@gmail.com");
     }
 
     @Test
