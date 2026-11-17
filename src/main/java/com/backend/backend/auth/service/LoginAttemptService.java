@@ -9,8 +9,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
-import com.backend.backend.custom.RateLimiter;
-
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -21,8 +19,6 @@ public class LoginAttemptService {
     private static final String LOCK_PREFIX = "login:lock:";
 
     private static final long STATUS_OK = 0; // chưa bị khoá
-    private static final long STATUS_JUST_LOCKED = 1; // vừa tăng và vừa bị khoá
-    private static final long STATUS_ALREADY_LOCKED = 2; // đang khoá sẵn, không tăng
 
     @SuppressWarnings("rawtypes")
     private static final DefaultRedisScript<List> LOGIN_FAILED = new DefaultRedisScript<>("""
@@ -61,7 +57,6 @@ public class LoginAttemptService {
             """, List.class);
 
     private final StringRedisTemplate stringRedisTemplate;
-    private final RateLimiter rateLimiter;
 
     @Value("${app.login.max-attempts-1}")
     private int loginAttemptLv1;
@@ -89,7 +84,7 @@ public class LoginAttemptService {
         return (ttl == null || ttl < 0) ? 0 : ttl;
     }
 
-    public boolean loginFailed(String identifier) {
+    public boolean loginAttemptFailed(String identifier) {
         @SuppressWarnings("unchecked")
         List<Long> result = stringRedisTemplate.execute(
                 LOGIN_FAILED,

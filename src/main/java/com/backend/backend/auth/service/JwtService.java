@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -108,21 +107,10 @@ public class JwtService {
         return extractClaim(token, Claims::getExpiration).before(new Date());
     }
 
-    private boolean isRolesMatch(String token, UserDetails userDetails) {
-        List<String> tokenRoles = extractRoles(token);
-        List<String> userRoles = userDetails.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toList());
-
-        return tokenRoles.size() == userRoles.size()
-                && tokenRoles.containsAll(userRoles);
-    }
-
     public boolean isTokenValid(String token, UserDetails userDetails) {
         String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())
-                && !isExpired(token)
-                && isRolesMatch(token, userDetails));
+                && !isExpired(token));
     }
 
     private SecretKey getSignInKey() {

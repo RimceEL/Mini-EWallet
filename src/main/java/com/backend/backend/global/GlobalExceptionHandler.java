@@ -82,9 +82,9 @@ public class GlobalExceptionHandler {
         if (ex instanceof BadCredentialsException) {
             message = "Email hoặc mật khẩu không chính xác";
         } else if (ex instanceof DisabledException) {
-            message = "Tài khoản của bạn chưa được xác thực email";
+            message = "Email hoặc mật khẩu không chính xác";
         } else if (ex instanceof LockedException) {
-            message = "Tài khoản của bạn đã bị khóa";
+            message = "Email hoặc mật khẩu không chính xác";
         } else if (ex instanceof UnloginException) {
             message = "Người dùng chưa đăng nhập hoặc Refresh Token không hợp lệ";
         } else if (ex instanceof ExpiredRefreshTokenException) {

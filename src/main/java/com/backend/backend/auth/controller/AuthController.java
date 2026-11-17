@@ -52,8 +52,10 @@ public class AuthController {
         String accessToken = jwtService.accessTokenGenerate(user, jti);
         String refreshToken = jwtService.refreshTokenGenerate(user, jti);
         String email = jwtService.extractUsername(refreshToken);
-        refreshTokenService.revokeAll(email);
-        refreshTokenService.store(email, jti, refreshToken);
+        // refreshTokenService.revokeAll(email);
+        // refreshTokenService.store(email, jti, refreshToken);
+        // Cách cũ phía trên không an toàn đa luồng
+        refreshTokenService.replaceSession(email, jti, refreshToken);
         LoginResponse loginResponse = LoginResponse
                 .builder()
                 .accessToken(accessToken)
@@ -89,6 +91,9 @@ public class AuthController {
         if (!refreshTokenService.isValid(email, oldJti, refreshToken))
             throw new UnloginException("");
         User user = authService.findUserByEmail(email);
+        if (!user.isEnabled() || !user.isAccountNonLocked()) {
+            throw new InvalidRefreshToken("");
+        }
         if (!refreshTokenService.revoke(email, oldJti)) {
             throw new RevokingException("");
         }

@@ -19,20 +19,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.backend.backend.auth.model.Role;
 import com.jayway.jsonpath.JsonPath;
 
-/**
- * BƯỚC 3: vòng đời phiên đăng nhập (access token + refresh token) trên MySQL và
- * Redis THẬT.
- *
- * Tư duy: đứng ở phía kẻ tấn công đang cầm một refresh token (đã đánh cắp, đã
- * cũ, bị sửa, hoặc dùng sai loại)
- * và tìm cách (1) có được phiên mới, (2) giữ phiên sống khi nạn nhân đã bị đăng
- * xuất,
- * (3) phá phiên của người khác.
- *
- * Một số test dưới đây là GIẢ THUYẾT mà tôi rút ra khi đọc code. Test có thể
- * đỏ, khi đó đó là phát hiện
- * chứ không phải lỗi của test. Chúng được đánh dấu "[GIẢ THUYẾT]" trong tên.
- */
 public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBase {
 
     private static final String EMAIL = "an@gmail.com";
@@ -47,10 +33,6 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         assertThat(statusOf(result)).isEqualTo(401);
         assertThat(jsonString(result, "$.code")).isEqualTo(expectedCode);
     }
-
-    // =====================================================================
-    // Nhóm A: xoay vòng (rotation)
-    // =====================================================================
 
     @Test
     @DisplayName("Đăng nhập: Redis chỉ lưu BĂM SHA-256 của refresh token, không lưu token thô")
@@ -91,20 +73,15 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         }
 
         long latestExpiry = jwtService.extractExpiration(current.refresh()).getTime();
-        assertThat(latestExpiry).isLessThanOrEqualTo(originalExpiry + 2000); // dung sai vài mili giây do làm tròn
+        assertThat(latestExpiry).isLessThanOrEqualTo(originalExpiry + 2000);
     }
-
-    // =====================================================================
-    // Nhóm B: phát hiện dùng lại refresh token (reuse detection)
-    // =====================================================================
 
     @Test
     @DisplayName("Dùng lại refresh token cũ => bị từ chối và HUỶ cả phiên mới (kẻ trộm và nạn nhân đều phải đăng nhập lại)")
     void reusedRefreshToken_revokesTheWholeSession() throws Exception {
         Tokens first = loginOk(EMAIL, PASSWORD);
-        Tokens second = refreshOk(first.refresh()); // một bên (nạn nhân hoặc kẻ trộm) đã xoay vòng trước
+        Tokens second = refreshOk(first.refresh());
 
-        // bên còn lại cầm bản sao của token cũ và dùng lại
         assertThat(statusOf(refreshRaw(first.refresh()))).isEqualTo(401);
 
         assertThat(sessionKeys(EMAIL)).isEmpty();
@@ -129,7 +106,7 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
     @DisplayName("Token cũ (chưa từng xoay vòng) bị đăng nhập mới thay thế KHÔNG được phá phiên hiện tại")
     void staleTokenFromReplacedSession_cannotKillCurrentSession() throws Exception {
         Tokens stale = loginOk(EMAIL, PASSWORD);
-        Tokens current = loginOk(EMAIL, PASSWORD); // đăng nhập lại: phiên cũ bị thay thế
+        Tokens current = loginOk(EMAIL, PASSWORD);
 
         assertThat(statusOf(refreshRaw(stale.refresh()))).isEqualTo(401);
 
@@ -137,10 +114,6 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         assertThat(statusOf(getWithToken(USER_URL, current.access()))).isEqualTo(200);
         refreshOk(current.refresh());
     }
-
-    // =====================================================================
-    // Nhóm C: đăng xuất
-    // =====================================================================
 
     @Test
     @DisplayName("Đăng xuất: thu hồi refresh token VÀ access token ngay lập tức")
@@ -174,10 +147,6 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         assertThat(statusOf(getWithToken(USER_URL, tokens.access()))).isEqualTo(200);
     }
 
-    // =====================================================================
-    // Nhóm D: dùng sai loại, bị sửa, ký sai, hết hạn, thiếu
-    // =====================================================================
-
     @Test
     @DisplayName("Dùng ACCESS token làm refresh token => 401, không tác dụng phụ")
     void accessTokenUsedAsRefresh_isRejected_withoutSideEffects() throws Exception {
@@ -186,7 +155,7 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         assertThat(statusOf(refreshRaw(tokens.access()))).isEqualTo(401);
 
         assertThat(sessionKeys(EMAIL)).hasSize(1);
-        refreshOk(tokens.refresh()); // refresh token thật vẫn xoay vòng được
+        refreshOk(tokens.refresh());
     }
 
     @Test
@@ -273,20 +242,14 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
     @DisplayName("[GIẢ THUYẾT] User bị KHOÁ sau khi đăng nhập => refresh KHÔNG được cấp token mới")
     void refresh_forBannedUser_shouldIssueNothing() throws Exception {
         Tokens tokens = loginOk(EMAIL, PASSWORD);
-        setActive(EMAIL, 0); // quản trị viên khoá tài khoản
+        setActive(EMAIL, 0);
 
         MvcResult result = refreshRaw(tokens.refresh());
 
-        // AuthController.refresh chỉ gọi findUserByEmail, không kiểm tra is_active, nên
-        // có thể vẫn trả 200
         assertThat(statusOf(result)).as("tài khoản bị khoá vẫn nhận được token mới: " + body(result))
                 .isBetween(400, 499);
         assertThat(body(result)).doesNotContain("accessToken");
     }
-
-    // =====================================================================
-    // Nhóm E: đồng thời
-    // =====================================================================
 
     @RepeatedTest(5)
     @DisplayName("8 request refresh đồng thời cùng một token => đúng 1 thắng, phiên không nhân bản, trạng thái nhất quán")
@@ -300,10 +263,6 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         assertThat(results).filteredOn(r -> statusOf(r) != 200).allMatch(r -> statusOf(r) == 401);
         assertThat(sessionKeys(EMAIL).size()).isLessThanOrEqualTo(1);
 
-        // Hai kết cục đều chấp nhận được, miễn NHẤT QUÁN: phiên còn <=> token của người
-        // thắng dùng được.
-        // (Nếu một request thua kịp phát hiện "dùng lại" thì cả phiên bị huỷ, đây là hệ
-        // quả của thiết kế.)
         Tokens winner = parseTokens(winners.get(0));
         boolean sessionAlive = !sessionKeys(EMAIL).isEmpty();
         assertThat(statusOf(getWithToken(USER_URL, winner.access())) == 200).isEqualTo(sessionAlive);
@@ -311,19 +270,13 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
     }
 
     @RepeatedTest(10)
-    @DisplayName("[GIẢ THUYẾT] 6 lần đăng nhập đồng thời cùng một user => chỉ còn đúng 1 phiên (thiết kế một phiên)")
+    @DisplayName("[GIẢ THUYẾT] Đăng nhập đồng thời (tối đa LOCK_ATTEMPTS_1 luồng) cùng một user => chỉ còn đúng 1 phiên")
     void concurrentLogins_leaveExactlyOneSession() throws Exception {
-        List<MvcResult> results = runConcurrently(6, () -> loginRaw(EMAIL, PASSWORD));
+        List<MvcResult> results = runConcurrently(LOCK_ATTEMPTS_1, () -> loginRaw(EMAIL, PASSWORD));
 
         assertThat(results).allMatch(r -> statusOf(r) == 200);
-        // login gọi revokeAll rồi mới store: hai bước không nguyên tử nên có thể sót
-        // nhiều phiên
         assertThat(sessionKeys(EMAIL)).hasSize(1);
     }
-
-    // =====================================================================
-    // Nhóm F: cô lập giữa các phiên và người dùng
-    // =====================================================================
 
     @Test
     @DisplayName("Đăng nhập lại thay thế phiên cũ: access và refresh của phiên cũ đều bị từ chối")
@@ -346,7 +299,7 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         Tokens a0 = loginOk(EMAIL, PASSWORD);
         refreshOk(a0.refresh());
 
-        assertThat(statusOf(refreshRaw(a0.refresh()))).isEqualTo(401); // A bị phát hiện dùng lại và bị huỷ phiên
+        assertThat(statusOf(refreshRaw(a0.refresh()))).isEqualTo(401);
 
         assertThat(statusOf(getWithToken(USER_URL, victimNeighbour.access()))).isEqualTo(200);
         assertThat(statusOf(getWithToken(USER_URL, otherNeighbour.access()))).isEqualTo(200);
@@ -356,37 +309,16 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
     @ValueSource(strings = { "*@shared.test", "alic?@shared.test", "a*e@shared.test" })
     @DisplayName("[GIẢ THUYẾT] Email chứa ký tự đại diện (* ?) không được phép thu hồi phiên của người khác")
     void emailWithGlobCharacters_cannotRevokeOtherUsersSessions(String attackerEmail) throws Exception {
-        // RefreshTokenService.revokeAll dùng lệnh KEYS với mẫu
-        // "refresh_token:<email>:*", còn
-        // EMAIL_REGEX của dự án cho phép '*' và '?' ở phần trước dấu @.
-        // Điều kiện để tấn công thật: kẻ tấn công phải nhận được mail xác thực tại địa
-        // chỉ đó
-        // (ví dụ domain do hắn kiểm soát hoặc hộp thư công cộng). Test chèn thẳng user
-        // đã xác thực để cô lập cơ chế.
         String victimEmail = "alice@shared.test";
         createUser(victimEmail, PASSWORD, Role.USER, 1, 1);
         createUser(attackerEmail, PASSWORD, Role.USER, 1, 1);
         Tokens victim = loginOk(victimEmail, PASSWORD);
 
-        loginOk(attackerEmail, PASSWORD); // login gọi revokeAll(attackerEmail)
+        loginOk(attackerEmail, PASSWORD);
 
         assertThat(sessionKeys(victimEmail)).as("phiên của nạn nhân bị xoá bởi người khác").hasSize(1);
         assertThat(statusOf(getWithToken(USER_URL, victim.access()))).isEqualTo(200);
     }
-
-    // =====================================================================
-    // Nhóm G: token vẫn hợp lệ nhưng DB đã đổi (kiểm tra NGAY ở request kế tiếp)
-    //
-    // Bộ lọc JWT đọc user từ DB ở MỖI request, nên role, khoá, xác thực email, xoá
-    // user
-    // phải có hiệu lực ngay, không cần đăng nhập lại và không có bộ nhớ đệm.
-    //
-    // Lưu ý giới hạn: request ĐÃ qua bộ lọc rồi mới bị đổi quyền thì vẫn chạy xong
-    // với quyền cũ.
-    // Cửa sổ này tồn tại ở mọi hệ thống dùng JWT và chỉ đóng được bằng cách kiểm
-    // tra lại quyền
-    // trong chính hành động nhạy cảm (ví dụ trong service thực thi giao dịch).
-    // =====================================================================
 
     @Test
     @DisplayName("Được nâng quyền USER -> ADMIN trong DB => CÙNG access token vào được API admin ngay")
@@ -404,7 +336,7 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
     @DisplayName("Bị hạ quyền ADMIN -> USER trong DB => CÙNG access token bị chặn khỏi API admin ngay")
     void demotionInDb_takesEffectOnNextRequest() throws Exception {
         setRole(EMAIL, Role.ADMIN);
-        Tokens tokens = loginOk(EMAIL, PASSWORD); // token này mang claim ADMIN
+        Tokens tokens = loginOk(EMAIL, PASSWORD);
         assertThat(statusOf(getWithToken(ADMIN_URL, tokens.access()))).isEqualTo(200);
         assertThat(JsonPath.<List<Object>>read(payloadOf(tokens.access()), "$.roles").toString())
                 .contains("ROLE_ADMIN");

@@ -20,21 +20,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.backend.backend.auth.model.Role;
 import com.jayway.jsonpath.JsonPath;
 
-/**
- * BƯỚC 4: cổng đăng nhập (POST /api/v1/auth/login) trên MySQL và Redis THẬT.
- *
- * Tư duy kẻ tấn công: (1) đoán mật khẩu nhiều nhất có thể, kể cả bằng request
- * song song;
- * (2) dò xem email nào tồn tại, tài khoản nào bị khoá hay chưa xác thực;
- * (3) gửi dữ liệu đầu vào bất thường để gây lỗi 500 hay làm lộ chi tiết nội bộ;
- * (4) khoá tài khoản của người khác.
- *
- * Các test đánh dấu "[GIẢ THUYẾT]" là điều tôi nghi ngờ khi đọc code. Test có
- * thể đỏ, khi đó là một phát hiện.
- *
- * Tên key Redis (login:fail:, login:lock:) là chi tiết cài đặt hiện tại của
- * LoginAttemptService.
- */
 public class LoginSecurityTest extends SecurityIntegrationTestBase {
 
     private static final String EMAIL = "an@gmail.com";
@@ -52,16 +37,11 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
         return loginRaw(email, WRONG);
     }
 
-    /** Đăng nhập sai n lần, mỗi lần phải trả 401 (chưa bị khoá). */
     private void failTimes(String email, int times) throws Exception {
         for (int i = 0; i < times; i++) {
             assertThat(statusOf(wrong(email))).as("lần sai thứ " + (i + 1)).isEqualTo(401);
         }
     }
-
-    // =====================================================================
-    // Nhóm A: nội dung phản hồi, rò rỉ thông tin, dữ liệu đầu vào bất thường
-    // =====================================================================
 
     @Test
     @DisplayName("Đăng nhập đúng: chỉ trả 2 token, token không chứa mật khẩu hay dữ liệu thừa")
@@ -79,7 +59,7 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
         assertThat(accessClaims.keySet()).containsExactlyInAnyOrder("roles", "jti", "sub", "iat", "exp");
         assertThat(refreshClaims.keySet()).containsExactlyInAnyOrder("jti", "sub", "iat", "exp");
         assertThat(payloadOf(tokens.access())).doesNotContain("$2a$").doesNotContain("password");
-        assertThat(accessClaims.get("jti")).isEqualTo(refreshClaims.get("jti")); // cùng một phiên
+        assertThat(accessClaims.get("jti")).isEqualTo(refreshClaims.get("jti"));
     }
 
     @Test
@@ -108,10 +88,6 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
     @DisplayName("[GIẢ THUYẾT] Sai mật khẩu với tài khoản bị khoá / chưa xác thực phải GIỐNG HỆT tài khoản bình thường")
     void wrongPassword_forNonActiveAccount_looksSameAsNormalAccount(int isActive, int isVerified)
             throws Exception {
-        // DaoAuthenticationProvider kiểm tra trạng thái tài khoản TRƯỚC khi kiểm tra
-        // mật khẩu,
-        // nên người không biết mật khẩu vẫn có thể phân biệt "bị khoá" / "chưa xác
-        // thực" / "bình thường".
         createUser("state@gmail.com", PASSWORD, Role.USER, isActive, isVerified);
 
         MvcResult normal = wrong(EMAIL);
@@ -175,10 +151,6 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
         assertThat(statusOf(loginRaw("  AN@GMAIL.COM  ", PASSWORD))).isEqualTo(200);
     }
 
-    // =====================================================================
-    // Nhóm B: khoá khi đoán mật khẩu (brute force)
-    // =====================================================================
-
     @Test
     @DisplayName("Sai đủ số lần => bị khoá, kể cả khi nhập ĐÚNG mật khẩu; không tạo phiên")
     void locksAfterMaxAttempts_evenForCorrectPassword() throws Exception {
@@ -199,7 +171,7 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
         assertThat(statusOf(loginRaw(EMAIL, PASSWORD))).isEqualTo(200);
         assertThat(redis.hasKey(FAIL_PREFIX + EMAIL)).isFalse();
 
-        failTimes(EMAIL, LOCK_ATTEMPTS_1 - 1); // đếm lại từ đầu nên vẫn chưa bị khoá
+        failTimes(EMAIL, LOCK_ATTEMPTS_1 - 1);
 
         assertThat(statusOf(loginRaw(EMAIL, PASSWORD))).isEqualTo(200);
     }
@@ -210,10 +182,15 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
         failTimes(EMAIL, LOCK_ATTEMPTS_1);
         assertThat(statusOf(loginRaw(EMAIL, PASSWORD))).isEqualTo(429);
 
-        redis.expire(LOCK_PREFIX + EMAIL, Duration.ofMillis(300)); // rút ngắn thời gian khoá để khỏi phải chờ
+        redis.expire(LOCK_PREFIX + EMAIL, Duration.ofMillis(300));
         Thread.sleep(900);
 
         assertThat(statusOf(loginRaw(EMAIL, PASSWORD))).isEqualTo(200);
+    }
+
+    private void failUntilLocked(String email, int allowed) throws Exception {
+        failTimes(email, allowed);
+        assertThat(statusOf(wrong(email))).as("lần chạm ngưỡng phải bị khoá").isEqualTo(429);
     }
 
     @Test
@@ -221,31 +198,18 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
     void lockDurations_escalate() throws Exception {
         String lockKey = LOCK_PREFIX + EMAIL;
 
-        failTimes(EMAIL, LOCK_ATTEMPTS_1 + 1);
-        dump("Check: ");
+        failUntilLocked(EMAIL, LOCK_ATTEMPTS_1);
         assertThat(redis.getExpire(lockKey, TimeUnit.SECONDS)).isBetween(1L, LOCK_MINUTES_1 * 60L);
 
-        redis.delete(lockKey); // mô phỏng hết hạn khoá lần 1, bộ đếm sai vẫn còn
-        dump("");
-        failTimes(EMAIL, LOCK_ATTEMPTS_2 - LOCK_ATTEMPTS_1 + 1);
-        dump("Check: ");
+        redis.delete(lockKey);
+        failUntilLocked(EMAIL, LOCK_ATTEMPTS_2 - LOCK_ATTEMPTS_1 - 1);
         assertThat(redis.getExpire(lockKey, TimeUnit.SECONDS))
                 .isBetween(LOCK_MINUTES_1 * 60L + 1, LOCK_MINUTES_2 * 60L);
 
         redis.delete(lockKey);
-        dump("Check: ");
-        failTimes(EMAIL, LOCK_ATTEMPTS_3 - LOCK_ATTEMPTS_2 + 1);
-        dump("Check: ");
+        failUntilLocked(EMAIL, LOCK_ATTEMPTS_3 - LOCK_ATTEMPTS_2 - 1);
         assertThat(redis.getExpire(lockKey, TimeUnit.SECONDS))
                 .isBetween(LOCK_MINUTES_2 * 60L + 1, LOCK_MINUTES_3 * 60L);
-    }
-
-    private void dump(String label) {
-        System.out.println(label
-                + " fail=" + redis.opsForValue().get(FAIL_PREFIX + EMAIL)
-                + " lock=" + redis.opsForValue().get(LOCK_PREFIX + EMAIL)
-                + " lockTtl=" + redis.getExpire(LOCK_PREFIX + EMAIL, TimeUnit.SECONDS)
-                + " keys=" + redis.keys("login:*"));
     }
 
     @Test
@@ -294,10 +258,6 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
     @Test
     @DisplayName("[GIẢ THUYẾT] 40 lần đoán mật khẩu SONG SONG không được vượt giới hạn số lần thử")
     void concurrentBruteForce_cannotExceedAttemptLimit() throws Exception {
-        // BCrypt cost 10 (khoảng vài chục mili giây mỗi lần) để cửa sổ "kiểm tra khoá
-        // rồi mới xác thực" đủ rộng,
-        // giống môi trường thật. Cost nằm trong chính chuỗi băm nên không cần đổi cấu
-        // hình ứng dụng.
         String target = "muctieu@gmail.com";
         createUserWithHash(target, new BCryptPasswordEncoder(10).encode(PASSWORD), Role.USER, 1, 1);
 
@@ -305,10 +265,6 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
 
         long guessesEvaluated = results.stream().filter(r -> statusOf(r) == 401).count();
         long blocked = results.stream().filter(r -> statusOf(r) == 429).count();
-        // AuthService.login: isBlocked() được kiểm tra trước, bộ đếm chỉ tăng SAU khi
-        // xác thực thất bại,
-        // nên nhiều request cùng lọt qua bước kiểm tra khoá trước khi khoá kịp được
-        // đặt.
         assertThat(guessesEvaluated)
                 .as("số lần đoán thực sự được xử lý = " + guessesEvaluated + ", bị chặn = " + blocked
                         + ", giới hạn cho phép = " + LOCK_ATTEMPTS_1)

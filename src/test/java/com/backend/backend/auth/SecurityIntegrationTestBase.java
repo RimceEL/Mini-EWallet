@@ -58,30 +58,11 @@ import com.jayway.jsonpath.JsonPath;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
-/**
- * Lớp nền cho các test security tích hợp (chạy cả ứng dụng thật):
- * - MySQL thật (Flyway chạy V1, V2 của dự án) và Redis thật, khởi động MỘT lần
- * cho mọi lớp test.
- * - Toàn bộ filter bảo mật, controller, service là bản thật. Chỉ EmailService
- * bị mock (không gửi mail thật).
- * - Mỗi test bắt đầu với Redis trống và bảng users trống.
- *
- * Hai điểm đặc biệt:
- * 1) RedisConfig của dự án bật SSL cứng (useSsl) nên không nối được vào Redis
- * container thường.
- * Ta cung cấp thêm một RedisConnectionFactory @Primary không SSL;
- * StringRedisTemplate của dự án sẽ dùng nó.
- * 2) Dự án chưa có API nào dưới /api/v1/admin/** nên ta thêm một controller giả
- * /api/v1/admin/ping.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(SecurityIntegrationTestBase.TestInfrastructure.class)
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
 public abstract class SecurityIntegrationTestBase {
-
-    // ---------------------------------------------------------------- hạ tầng dùng
-    // chung
 
     static final MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.1"))
             .withDatabaseName("wallet_test")
@@ -96,7 +77,6 @@ public abstract class SecurityIntegrationTestBase {
         REDIS.start();
     }
 
-    // Các giá trị cấu hình mà test cần biết để tính kỳ vọng
     static final String JWT_SECRET = "integration-secret-integration-secret-12345";
     static final int ACCESS_TTL_MS = 300_000;
     static final int REFRESH_TTL_MS = 3_600_000;
@@ -109,7 +89,7 @@ public abstract class SecurityIntegrationTestBase {
 
     static final String USER_URL = "/api/v1/user/user-details";
     static final String ADMIN_URL = "/api/v1/admin/ping";
-    static final String PASSWORD = "MatKhauDuMuoiHaiKyTu!1"; // >= 12 ký tự
+    static final String PASSWORD = "MatKhauDuMuoiHaiKyTu!1";
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -117,8 +97,6 @@ public abstract class SecurityIntegrationTestBase {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
 
-        // RedisConfig của dự án đọc 4 giá trị này (bean đó bị ghi đè bởi bản @Primary
-        // bên dưới)
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
         registry.add("spring.data.redis.username", () -> "");
@@ -127,7 +105,7 @@ public abstract class SecurityIntegrationTestBase {
         registry.add("jwt.secret", () -> JWT_SECRET);
         registry.add("jwt.access.expiration", () -> ACCESS_TTL_MS);
         registry.add("jwt.refresh.expiration", () -> REFRESH_TTL_MS);
-        registry.add("password.strength", () -> 4); // BCrypt rẻ cho nhanh; test riêng tự băm với cost cao khi cần
+        registry.add("password.strength", () -> 4);
 
         registry.add("app.login.max-attempts-1", () -> LOCK_ATTEMPTS_1);
         registry.add("app.login.max-attempts-2", () -> LOCK_ATTEMPTS_2);
@@ -157,10 +135,6 @@ public abstract class SecurityIntegrationTestBase {
         }
     }
 
-    /**
-     * Controller giả để có một endpoint dưới /api/v1/admin/** (chỉ ADMIN được vào
-     * theo SecurityConfig).
-     */
     @TestComponent
     @RestController
     @RequestMapping("/api/v1/admin")
@@ -191,11 +165,8 @@ public abstract class SecurityIntegrationTestBase {
         if (keys != null && !keys.isEmpty()) {
             redis.delete(keys);
         }
-        jdbc.update("DELETE FROM users"); // ví bị xoá theo (ON DELETE CASCADE)
+        jdbc.update("DELETE FROM users");
     }
-
-    // ---------------------------------------------------------------- dữ liệu
-    // người dùng
 
     protected record Tokens(String access, String refresh) {
     }
@@ -223,8 +194,6 @@ public abstract class SecurityIntegrationTestBase {
     protected void setVerified(String email, int isVerified) {
         jdbc.update("UPDATE users SET is_verified = ? WHERE email = ?", isVerified, email);
     }
-
-    // ---------------------------------------------------------------- gọi API
 
     protected MvcResult postJson(String url, String json) throws Exception {
         return mockMvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(json)).andReturn();
@@ -278,18 +247,10 @@ public abstract class SecurityIntegrationTestBase {
         return new Tokens(access, refresh);
     }
 
-    /** Các khoá phiên (refresh token) đang sống của một email trong Redis. */
     protected Set<String> sessionKeys(String email) {
         return redis.keys("refresh_token:" + email + ":*");
     }
 
-    // ---------------------------------------------------------------- chạy đồng
-    // thời
-
-    /**
-     * Chạy cùng một việc trên N luồng, giữ tất cả ở vạch xuất phát rồi thả cùng
-     * lúc.
-     */
     protected static <T> List<T> runConcurrently(int threads, Callable<T> task) throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         CountDownLatch ready = new CountDownLatch(threads);
@@ -315,9 +276,6 @@ public abstract class SecurityIntegrationTestBase {
         }
     }
 
-    // ---------------------------------------------------------------- công cụ của
-    // "kẻ tấn công"
-
     protected static Map<String, Object> claims(String jti) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("jti", jti);
@@ -342,7 +300,6 @@ public abstract class SecurityIntegrationTestBase {
         return new String(Base64.getUrlDecoder().decode(jwt.split("\\.")[1]), StandardCharsets.UTF_8);
     }
 
-    /** Giữ nguyên chữ ký cũ nhưng sửa nội dung payload: chữ ký không còn khớp. */
     protected static String tamperPayload(String jwt, String from, String to) {
         String[] parts = jwt.split("\\.");
         String payload = payloadOf(jwt);

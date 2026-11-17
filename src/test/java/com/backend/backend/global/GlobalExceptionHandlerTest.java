@@ -192,8 +192,8 @@ class GlobalExceptionHandlerTest {
     static Stream<Arguments> authenticationExceptions() {
         return Stream.of(
                 Arguments.of(new BadCredentialsException("x"), "Email hoặc mật khẩu không chính xác"),
-                Arguments.of(new DisabledException("x"), "Tài khoản của bạn chưa được xác thực email"),
-                Arguments.of(new LockedException("x"), "Tài khoản của bạn đã bị khóa"),
+                Arguments.of(new DisabledException("x"), "Email hoặc mật khẩu không chính xác"),
+                Arguments.of(new LockedException("x"), "Email hoặc mật khẩu không chính xác"),
                 Arguments.of(new UnloginException("x"),
                         "Người dùng chưa đăng nhập hoặc Refresh Token không hợp lệ"),
                 Arguments.of(new ExpiredRefreshTokenException("x"),

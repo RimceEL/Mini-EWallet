@@ -32,7 +32,7 @@ public class AuthService {
     public User login(LoginRequest request) {
         if (!ValidationUtils.isValidEmail(request.getEmail()))
             throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
-        if (loginAttemptService.loginFailed(request.getEmail()))
+        if (loginAttemptService.loginAttemptFailed(request.getEmail()))
             throw new LoginLockedException("Đăng nhập sai quá nhiều lần! Vui lòng thử lại trong "
                     + loginAttemptService.getRemainingLockSeconds(request.getEmail()) + " giây nữa...");
         User user;
