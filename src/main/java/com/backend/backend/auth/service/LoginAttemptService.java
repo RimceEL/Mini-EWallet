@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import com.backend.backend.custom.RateLimiter;
@@ -18,6 +19,46 @@ public class LoginAttemptService {
 
     private static final String FAIL_PREFIX = "login:fail:";
     private static final String LOCK_PREFIX = "login:lock:";
+
+    private static final long STATUS_OK = 0; // chưa bị khoá
+    private static final long STATUS_JUST_LOCKED = 1; // vừa tăng và vừa bị khoá
+    private static final long STATUS_ALREADY_LOCKED = 2; // đang khoá sẵn, không tăng
+
+    @SuppressWarnings("rawtypes")
+    private static final DefaultRedisScript<List> LOGIN_FAILED = new DefaultRedisScript<>("""
+            -- KEYS[1] = failKey, KEYS[2] = lockKey
+            -- ARGV[1] = counterTtlSeconds
+            -- ARGV[2],[3] = attempts lv1, lockSeconds lv1
+            -- ARGV[4],[5] = attempts lv2, lockSeconds lv2
+            -- ARGV[6],[7] = attempts lv3, lockSeconds lv3
+
+            -- 1. Đang khoá thì không tăng, chỉ báo trạng thái
+            if redis.call('EXISTS', KEYS[2]) == 1 then
+                local cur = tonumber(redis.call('GET', KEYS[1])) or 0
+                return {2, cur}
+            end
+
+            -- 2. Tăng bộ đếm và đặt expire (refresh mỗi lần fail như cũ)
+            local n = redis.call('INCR', KEYS[1])
+            redis.call('EXPIRE', KEYS[1], ARGV[1])
+
+            -- 3. Xác định thời gian khoá (giữ nguyên thứ tự lv3 -> lv2 -> lv1)
+            local lockSeconds = 0
+            if n == tonumber(ARGV[6]) + 1 then
+                lockSeconds = tonumber(ARGV[7])
+            elseif n == tonumber(ARGV[4]) + 1 then
+                lockSeconds = tonumber(ARGV[5])
+            elseif n == tonumber(ARGV[2]) + 1 then
+                lockSeconds = tonumber(ARGV[3])
+            end
+
+            -- 4. Set khoá lock với TTL
+            if lockSeconds > 0 then
+                redis.call('SET', KEYS[2], tostring(n), 'EX', lockSeconds)
+                return {1, n}
+            end
+            return {0, n}
+            """, List.class);
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RateLimiter rateLimiter;
@@ -48,28 +89,21 @@ public class LoginAttemptService {
         return (ttl == null || ttl < 0) ? 0 : ttl;
     }
 
-    public void loginFailed(String identifier) {
-        String failKey = failKey(identifier);
-        Long attempts = rateLimiter.incrementAndExpire(failKey, Duration.ofMinutes(counterTtlMinutes()));
-        int lockMinutes = resolveLockMinutes(attempts);
-        if (lockMinutes > 0) {
-            stringRedisTemplate.opsForValue()
-                    .set(lockKey(identifier), String.valueOf(attempts), Duration.ofMinutes(lockMinutes));
-        }
+    public boolean loginFailed(String identifier) {
+        @SuppressWarnings("unchecked")
+        List<Long> result = stringRedisTemplate.execute(
+                LOGIN_FAILED,
+                List.of(failKey(identifier), lockKey(identifier)),
+                String.valueOf(Duration.ofMinutes(counterTtlMinutes()).toSeconds()),
+                String.valueOf(loginAttemptLv1), String.valueOf(loginLockLv1 * 60L),
+                String.valueOf(loginAttemptLv2), String.valueOf(loginLockLv2 * 60L),
+                String.valueOf(loginAttemptLv3), String.valueOf(loginLockLv3 * 60L));
+
+        return result != null && !result.isEmpty() && result.get(0) != STATUS_OK;
     }
 
     public void loginSucceeded(String identifier) {
         stringRedisTemplate.delete(List.of(failKey(identifier), lockKey(identifier)));
-    }
-
-    private int resolveLockMinutes(long attempts) {
-        if (attempts == loginAttemptLv3)
-            return loginLockLv3;
-        if (attempts == loginAttemptLv2)
-            return loginLockLv2;
-        if (attempts == loginAttemptLv1)
-            return loginLockLv1;
-        return 0;
     }
 
     private long counterTtlMinutes() {

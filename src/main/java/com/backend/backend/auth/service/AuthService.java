@@ -30,11 +30,11 @@ public class AuthService {
     private final LoginAttemptService loginAttemptService;
 
     public User login(LoginRequest request) {
-        if (loginAttemptService.isBlocked(request.getEmail()))
-            throw new LoginLockedException("Đăng nhập sai quá nhiều lần! Vui lòng thử lại trong "
-                    + loginAttemptService.getRemainingLockSeconds(request.getEmail()) + " giây nữa...");
         if (!ValidationUtils.isValidEmail(request.getEmail()))
             throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
+        if (loginAttemptService.loginFailed(request.getEmail()))
+            throw new LoginLockedException("Đăng nhập sai quá nhiều lần! Vui lòng thử lại trong "
+                    + loginAttemptService.getRemainingLockSeconds(request.getEmail()) + " giây nữa...");
         User user;
         try {
             Authentication auth = authenticationManager
@@ -42,7 +42,6 @@ public class AuthService {
             user = (User) auth.getPrincipal();
 
         } catch (BadCredentialsException e) {
-            loginAttemptService.loginFailed(request.getEmail());
             throw e;
         }
 
