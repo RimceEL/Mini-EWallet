@@ -113,7 +113,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/logout")
-    public String logout(@RequestBody RefreshTokenRequest request) {
+    public ApiResponse<String> logout(@RequestBody RefreshTokenRequest request) {
         String refreshToken = request.getRefreshToken();
         String email;
         String oldJti;
@@ -129,7 +129,7 @@ public class AuthController {
             throw new UnloginException("");
         refreshTokenService.revoke(email, oldJti);
         refreshTokenService.clearUsed(email);
-        return "Logout Successfully";
+        return new ApiResponse<>(0, "Đăng xuất thành công", "");
     }
 
     @PostMapping("/auth/verify-email")

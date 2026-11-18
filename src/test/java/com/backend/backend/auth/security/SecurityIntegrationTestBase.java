@@ -1,10 +1,12 @@
-package com.backend.backend.auth;
+package com.backend.backend.auth.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
@@ -36,6 +38,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -165,7 +168,29 @@ public abstract class SecurityIntegrationTestBase {
         if (keys != null && !keys.isEmpty()) {
             redis.delete(keys);
         }
-        jdbc.update("DELETE FROM users");
+        jdbc.execute((ConnectionCallback<Void>) con -> {
+            try (Statement st = con.createStatement()) {
+                List<String> tables = new ArrayList<>();
+                try (ResultSet rs = st.executeQuery(
+                        "SELECT table_name FROM information_schema.tables "
+                                + "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' "
+                                + "AND table_name <> 'flyway_schema_history'")) {
+                    while (rs.next()) {
+                        tables.add(rs.getString(1));
+                    }
+                }
+
+                st.execute("SET FOREIGN_KEY_CHECKS = 0");
+                try {
+                    for (String table : tables) {
+                        st.execute("TRUNCATE TABLE `" + table + "`");
+                    }
+                } finally {
+                    st.execute("SET FOREIGN_KEY_CHECKS = 1");
+                }
+            }
+            return null;
+        });
     }
 
     protected record Tokens(String access, String refresh) {

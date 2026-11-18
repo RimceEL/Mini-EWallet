@@ -1,5 +1,6 @@
 package com.backend.backend.auth.service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -32,6 +34,23 @@ public class JwtService {
 
     @Value("${jwt.refresh.expiration}")
     private long JWT_REFRESH_TOKEN_EXPIRATION;
+
+    @Value("${jwt.min_secret_bytes}")
+    private int MIN_SECRET_BYTES;
+
+    @PostConstruct
+    void init() {
+        if (SERECT_KEY == null || SERECT_KEY.isBlank()) {
+            throw new IllegalStateException("jwt.secret không được để trống");
+        }
+
+        byte[] keyBytes = SERECT_KEY.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "jwt.secret phải có độ dài tối thiểu " + MIN_SECRET_BYTES + " byte (hiện tại: " + keyBytes.length
+                            + " byte)");
+        }
+    }
 
     public String accessTokenGenerate(UserDetails userDetails, String jti) {
         HashMap<String, Object> claims = new HashMap<>();

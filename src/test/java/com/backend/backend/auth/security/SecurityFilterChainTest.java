@@ -1,4 +1,4 @@
-package com.backend.backend.auth;
+package com.backend.backend.auth.security;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
