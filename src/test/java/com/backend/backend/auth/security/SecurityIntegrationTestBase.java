@@ -88,7 +88,7 @@ public abstract class SecurityIntegrationTestBase {
     static final int LOCK_ATTEMPTS_3 = 9;
     static final int LOCK_MINUTES_1 = 1;
     static final int LOCK_MINUTES_2 = 5;
-    static final int LOCK_MINUTES_3 = 15;
+    static final int LOCK_MINUTES_3 = 1440;
 
     static final String USER_URL = "/api/v1/user/user-details";
     static final String ADMIN_URL = "/api/v1/admin/ping";

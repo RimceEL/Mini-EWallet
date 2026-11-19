@@ -35,6 +35,12 @@ public class EmailService {
                         + "Nếu không phải bạn thực hiện, hãy liên hệ hỗ trợ ngay.");
     }
 
+    public void sendTryToLoginWarning(String to) {
+        send(to, "Ai đó đang cố gắng truy cập vào tài khoản của bạn",
+                "Chúng tôi đã tạm thời khoá tài khoản của bạn do cố gắng truy cập vào tài khoản không thành công. "
+                        + "Nếu đó không phải bạn thực hiện, hãy đổi mật khẩu ngay lập tức hoặc liên hệ hỗ trợ ngay.");
+    }
+
     public void sendTransactionOtp(String to, String otp, int ttlMinutes, Transaction transaction) {
         send(to, "Mã xác thực cho giao dịch " + transaction.getReferenceId(),
                 "Mã OTP của bạn là: " + otp + "\n"

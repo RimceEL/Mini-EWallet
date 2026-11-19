@@ -1,6 +1,11 @@
 package com.backend.backend.auth.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -14,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -27,6 +33,9 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
     private static final String FAIL_PREFIX = "login:fail:";
     private static final String LOCK_PREFIX = "login:lock:";
     private static final String GENERIC_BAD_CREDENTIALS = "Email hoặc mật khẩu không chính xác";
+
+    private static final String LOCK_KEY = "login:lock:" + EMAIL;
+    private static final String WRONG_PASSWORD = "SaiMatKhau!123456";
 
     @BeforeEach
     void seedUser() {
@@ -269,5 +278,156 @@ public class LoginSecurityTest extends SecurityIntegrationTestBase {
                 .as("số lần đoán thực sự được xử lý = " + guessesEvaluated + ", bị chặn = " + blocked
                         + ", giới hạn cho phép = " + LOCK_ATTEMPTS_1)
                 .isLessThanOrEqualTo(LOCK_ATTEMPTS_1);
+    }
+
+    private int wrongAttempt() throws Exception {
+        return statusOf(loginRaw(EMAIL, WRONG_PASSWORD));
+    }
+
+    private int driveThroughAllThreeLockLevels() throws Exception {
+        int locks = 0;
+        for (int attempt = 1; attempt <= LOCK_ATTEMPTS_3 + 1; attempt++) {
+            if (wrongAttempt() == 429) {
+                locks++;
+                redis.delete(LOCK_KEY);
+            }
+        }
+        return locks;
+    }
+
+    @Test
+    @DisplayName("[GIẢ THUYẾT] Sau khi khoá mức 3 hết hạn, tiếp tục sai mật khẩu thì phải bị khoá lại")
+    void afterLevelThreeLockExpires_furtherWrongAttemptsMustLockAgain() throws Exception {
+        assertThat(driveThroughAllThreeLockLevels())
+                .as("tiền điều kiện: 3 mức khoá đầu tiên hoạt động (ở lần sai thứ 4, 7, 10)")
+                .isEqualTo(3);
+
+        int locksAfterLevelThree = 0;
+        for (int i = 0; i < 20; i++) {
+            if (wrongAttempt() == 429) {
+                locksAfterLevelThree++;
+                redis.delete(LOCK_KEY);
+            }
+        }
+
+        assertThat(locksAfterLevelThree)
+                .as("20 lần sai tiếp theo sau khoá mức 3 không bị khoá lần nào => đoán mật khẩu vô hạn")
+                .isGreaterThan(0);
+    }
+
+    @Test
+    @DisplayName("[GIẢ THUYẾT] 60 lần thử sai (khoá nào hết hạn là thử tiếp): số lần mật khẩu thật sự được kiểm tra phải bị chặn trần")
+    void totalPasswordGuesses_areBoundedEvenWhenLocksExpire() throws Exception {
+        int guessesActuallyChecked = 0;
+        for (int i = 0; i < 60; i++) {
+            int status = wrongAttempt();
+            if (status == 429) {
+                redis.delete(LOCK_KEY);
+            } else if (status == 401) {
+                guessesActuallyChecked++;
+            }
+        }
+
+        assertThat(guessesActuallyChecked)
+                .as("số lần mật khẩu được so khớp trong 60 lần thử; kẻ tấn công nên bị chặn gần mức "
+                        + LOCK_ATTEMPTS_3)
+                .isLessThanOrEqualTo(LOCK_ATTEMPTS_3 * 2);
+    }
+
+    private void driveToJustBeforeLevelThree() throws Exception {
+        for (int attempt = 1; attempt <= LOCK_ATTEMPTS_3; attempt++) {
+            if (wrongAttempt() == 429) {
+                redis.delete(LOCK_KEY);
+            }
+        }
+    }
+
+    private void driveToLevelThreeLock() throws Exception {
+        driveToJustBeforeLevelThree();
+        assertThat(wrongAttempt())
+                .as("lần sai thứ " + (LOCK_ATTEMPTS_3 + 1) + " phải kích hoạt khoá mức 3")
+                .isEqualTo(429);
+        assertThat(redis.hasKey(LOCK_KEY)).as("khoá mức 3 phải còn tồn tại").isTrue();
+    }
+
+    @Test
+    @DisplayName("Khoá mức 3 kéo dài: nhập ĐÚNG mật khẩu vẫn bị chặn, không cấp token, không tạo phiên")
+    void levelThreeLock_blocksEvenCorrectPassword() throws Exception {
+        driveToLevelThreeLock();
+
+        MvcResult correct = loginRaw(EMAIL, PASSWORD);
+
+        assertThat(statusOf(correct)).isEqualTo(429);
+        assertThat(body(correct)).doesNotContain("accessToken").doesNotContain("refreshToken");
+        assertThat(sessionKeys(EMAIL)).isEmpty();
+    }
+
+    @Value("${app.login.expiration-minutes-3}")
+    private int lockLv3Minutes;
+
+    @Value("${app.login.attempt.duration-minutes}")
+    private int counterMinutes;
+
+    @Test
+    @DisplayName("Cấu hình thật: thời gian khoá mức 3 phải >= thời hạn bộ đếm")
+    void levelThreeLock_isNotShorterThanFailureCounter() {
+        assertThat(lockLv3Minutes)
+                .as("app.login.expiration-minutes-3 (" + lockLv3Minutes
+                        + ") phải >= app.login.attempt.duration-minutes (" + counterMinutes
+                        + "), nếu không khi khoá hết bộ đếm còn sống và người dùng bị khoá lại ngay")
+                .isGreaterThanOrEqualTo(counterMinutes);
+    }
+
+    @Test
+    @DisplayName("[Đối chứng] Khoá mức 3 hết hạn thật sự (khoá và bộ đếm cùng hết) thì đăng nhập đúng được và chu kỳ bắt đầu lại")
+    void correctLoginAfterLevelThreeFullyExpires_succeedsAndResetsTheCounter() throws Exception {
+        driveToLevelThreeLock();
+        redis.delete(LOCK_KEY);
+        redis.delete(FAIL_PREFIX + EMAIL);
+
+        assertThat(statusOf(loginRaw(EMAIL, PASSWORD))).as("đăng nhập đúng sau khi hết khoá").isEqualTo(200);
+
+        for (int i = 0; i < LOCK_ATTEMPTS_1; i++) {
+            assertThat(wrongAttempt()).as("lần sai thứ " + (i + 1) + " sau khi làm mới").isEqualTo(401);
+        }
+        assertThat(wrongAttempt()).as("bộ đếm bắt đầu lại từ đầu nên khoá mức 1 xuất hiện lại").isEqualTo(429);
+    }
+
+    @Test
+    @DisplayName("Lần sai kích hoạt khoá mức 3 trả thông báo yêu cầu đặt lại mật khẩu")
+    void levelThreeTriggeringAttempt_asksForPasswordReset() throws Exception {
+        driveToJustBeforeLevelThree();
+
+        MvcResult result = loginRaw(EMAIL, WRONG_PASSWORD);
+
+        assertThat(statusOf(result)).isEqualTo(429);
+        assertThat(jsonString(result, "$.message")).contains("đặt lại mật khẩu");
+    }
+
+    @Test
+    @DisplayName("[GIẢ THUYẾT] Khi đang bị khoá mức 3, các lần thử tiếp theo cũng phải báo đặt lại mật khẩu (không phải đếm ngược hàng triệu giây)")
+    void levelThreeLock_laterAttempts_alsoAskForPasswordReset() throws Exception {
+        driveToLevelThreeLock();
+
+        MvcResult later = loginRaw(EMAIL, PASSWORD);
+
+        assertThat(statusOf(later)).isEqualTo(429);
+        assertThat(jsonString(later, "$.message"))
+                .as("thông báo khi thử lại lúc đang khoá mức 3")
+                .contains("đặt lại mật khẩu");
+    }
+
+    @Test
+    @DisplayName("Chỉ gửi email cảnh báo đúng 1 lần, khi khoá mức 3 được đặt (không gửi ở mức 1, 2 và không gửi lại khi thử tiếp lúc đang khoá)")
+    void levelThreeLock_sendsWarningEmailExactlyOnce() throws Exception {
+        driveToJustBeforeLevelThree();
+        verify(emailService, never()).sendTryToLoginWarning(anyString());
+
+        assertThat(wrongAttempt()).isEqualTo(429);
+        verify(emailService, timeout(3000)).sendTryToLoginWarning(EMAIL);
+
+        wrongAttempt();
+        loginRaw(EMAIL, PASSWORD);
+        verify(emailService, after(500).times(1)).sendTryToLoginWarning(anyString());
     }
 }
