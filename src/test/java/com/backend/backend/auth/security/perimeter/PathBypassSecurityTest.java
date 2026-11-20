@@ -1,4 +1,4 @@
-package com.backend.backend.auth.security;
+package com.backend.backend.auth.security.perimeter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
@@ -17,6 +17,7 @@ import org.springframework.security.web.firewall.RequestRejectedException;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.backend.backend.auth.model.Role;
+import com.backend.backend.auth.security.SecurityIntegrationTestBase;
 
 public class PathBypassSecurityTest extends SecurityIntegrationTestBase {
 

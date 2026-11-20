@@ -29,6 +29,7 @@ public class AuthService {
     private final AuthRepository authRepository;
     private final EmailVerificationService emailVerificationService;
     private final LoginAttemptService loginAttemptService;
+    private final AsyncMailRunner asyncMailRunner;
 
     public User login(LoginRequest request) {
         if (!ValidationUtils.isValidEmail(request.getEmail()))
@@ -69,7 +70,7 @@ public class AuthService {
         } catch (DuplicateKeyException e) {
             throw new UserExistedException("Email đã tồn tại");
         }
-        emailVerificationService.generateAndSend(request.getEmail());
+        asyncMailRunner.run(() -> emailVerificationService.generateAndSend(request.getEmail()));
     }
 
     public void verifyEmail(String email, String code) {

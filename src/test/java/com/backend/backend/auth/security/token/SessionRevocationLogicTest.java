@@ -1,4 +1,4 @@
-package com.backend.backend.auth.security;
+package com.backend.backend.auth.security.token;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -14,6 +14,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.backend.backend.auth.model.Role;
+import com.backend.backend.auth.security.SecurityIntegrationTestBase;
 import com.backend.backend.auth.service.RefreshTokenService;
 
 public class SessionRevocationLogicTest extends SecurityIntegrationTestBase {

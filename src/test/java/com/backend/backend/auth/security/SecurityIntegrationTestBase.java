@@ -80,19 +80,19 @@ public abstract class SecurityIntegrationTestBase {
         REDIS.start();
     }
 
-    static final String JWT_SECRET = "integration-secret-integration-secret-12345";
-    static final int ACCESS_TTL_MS = 300_000;
-    static final int REFRESH_TTL_MS = 3_600_000;
-    static final int LOCK_ATTEMPTS_1 = 3;
-    static final int LOCK_ATTEMPTS_2 = 6;
-    static final int LOCK_ATTEMPTS_3 = 9;
-    static final int LOCK_MINUTES_1 = 1;
-    static final int LOCK_MINUTES_2 = 5;
-    static final int LOCK_MINUTES_3 = 1440;
+    protected static final String JWT_SECRET = "integration-secret-integration-secret-12345";
+    protected static final int ACCESS_TTL_MS = 300_000;
+    protected static final int REFRESH_TTL_MS = 3_600_000;
+    protected static final int LOCK_ATTEMPTS_1 = 3;
+    protected static final int LOCK_ATTEMPTS_2 = 6;
+    protected static final int LOCK_ATTEMPTS_3 = 9;
+    protected static final int LOCK_MINUTES_1 = 1;
+    protected static final int LOCK_MINUTES_2 = 5;
+    protected static final int LOCK_MINUTES_3 = 1440;
 
-    static final String USER_URL = "/api/v1/user/user-details";
-    static final String ADMIN_URL = "/api/v1/admin/ping";
-    static final String PASSWORD = "MatKhauDuMuoiHaiKyTu!1";
+    protected static final String USER_URL = "/api/v1/user/user-details";
+    protected static final String ADMIN_URL = "/api/v1/admin/ping";
+    protected static final String PASSWORD = "MatKhauDuMuoiHaiKyTu!1";
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
