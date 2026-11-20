@@ -1,5 +1,6 @@
 package com.backend.backend.auth.service;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -51,21 +52,23 @@ public class AuthService {
 
     public void register(RegisterRequest request) {
         if (!ValidationUtils.isValidUsername(request.getUsername()))
-            throw new InvalidRegisterRequest("Username không hợp lệ! Username phải chứa từ 6 kí tự");
+            throw new InvalidRegisterRequest("Username không hợp lệ! Username phải chứa từ 6 kí tự và không quá dài");
 
         if (!ValidationUtils.isValidEmail(request.getEmail()))
             throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
 
-        if (authRepository.findUserByEmail(request.getEmail()).orElse(null) != null)
-            throw new UserExistedException("Email đã tồn tại");
-
         if (!ValidationUtils.isValidPassword(request.getPassword()))
-            throw new InvalidRegisterRequest("Mật khẩu không hợp lệ! Mật khẩu phải chứa từ 12 kí tự");
+            throw new InvalidRegisterRequest(
+                    "Mật khẩu không hợp lệ! Mật khẩu phải chứa từ 12 kí tự, chứa ít nhất 1 chữ hoa, ít nhất 1 kí tự đặc biệt và không được quá dài");
 
         if (!ValidationUtils.isValidFullName(request.getFullName()))
-            throw new InvalidRegisterRequest("Fullname không hợp lệ! Fullname phải chứa từ 6 kí tự");
+            throw new InvalidRegisterRequest("Fullname không hợp lệ! Fullname phải chứa từ 6 kí tự và không quá dài");
         request.setPassword(passwordEncoder.encode(request.getPassword()));
-        authRepository.register(request);
+        try {
+            authRepository.register(request);
+        } catch (DuplicateKeyException e) {
+            throw new UserExistedException("Email đã tồn tại");
+        }
         emailVerificationService.generateAndSend(request.getEmail());
     }
 

@@ -125,9 +125,13 @@ public class AuthController {
         } catch (JwtException | IllegalArgumentException | UsernameNotFoundException e) {
             throw new InvalidRefreshToken("");
         }
-        if (!refreshTokenService.isValid(email, oldJti, refreshToken))
-            throw new UnloginException("");
-        refreshTokenService.revoke(email, oldJti);
+        // if (!refreshTokenService.isValid(email, oldJti, refreshToken))
+        // throw new UnloginException("");
+        // refreshTokenService.revoke(email, oldJti);
+        // Cách cũ không an toàn cho đa luồng
+        if (!refreshTokenService.validateAndRevoke(email, oldJti, refreshToken)) {
+            throw new InvalidRefreshToken("");
+        }
         refreshTokenService.clearUsed(email);
         return new ApiResponse<>(0, "Đăng xuất thành công", "");
     }

@@ -132,7 +132,8 @@ public class PasswordResetService {
         }
 
         if (!ValidationUtils.isValidPassword(newPassword)) {
-            throw new InvalidRegisterRequest("Mật khẩu không hợp lệ! Mật khẩu phải chứa từ 12 kí tự");
+            throw new InvalidRegisterRequest(
+                    "Mật khẩu không hợp lệ! Mật khẩu phải chứa từ 12 kí tự, chứa ít nhất 1 chữ hoa và ít nhất 1 kí tự đặc biệt và không được quá dài");
         }
 
         String tokenKey = TOKEN_PREFIX + email;
@@ -154,7 +155,7 @@ public class PasswordResetService {
         refreshTokenService.revokeAll(email);
         loginAttemptService.loginSucceeded(email);
         redis.delete(List.of(OTP_PREFIX + email, OTP_FAIL_PREFIX + email, RESEND_PREFIX + email));
-        emailService.sendPasswordChangedNotice(email);
+        asyncMailRunner.run(() -> emailService.sendPasswordChangedNotice(email));
     }
 
     private String generateToken() {

@@ -3,9 +3,12 @@ package com.backend.backend.auth.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,10 +16,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.backend.backend.auth.model.Role;
+import com.backend.backend.auth.service.RefreshTokenService;
 import com.jayway.jsonpath.JsonPath;
 
 public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBase {
@@ -397,4 +403,114 @@ public class RefreshTokenLifecycleSecurityTest extends SecurityIntegrationTestBa
         assertThat(statusOf(result)).isEqualTo(401);
         assertThat(jsonString(result, "$.code")).isEqualTo("TOKEN_INVALID");
     }
+
+    private static final String VICTIM = "victim@shared.test";
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+
+    static Stream<String> globAttackerEmails() {
+        return Stream.of(
+                "*@shared.test",
+                "?ictim@shared.test",
+                "[v]ictim@shared.test",
+                "victi*@shared.test");
+    }
+
+    @ParameterizedTest(name = "email tấn công = {0}")
+    @MethodSource("globAttackerEmails")
+    @DisplayName("[GIẢ THUYẾT] revokeAll(email chứa * ? [ ]) không được xoá phiên của người khác")
+    void revokeAll_withGlobCharacters_doesNotTouchOtherUsersSessions(String attackerEmail) {
+        refreshTokenService.store(VICTIM, "jti-victim", "raw-victim");
+        refreshTokenService.store(attackerEmail, "jti-attacker", "raw-attacker");
+
+        refreshTokenService.revokeAll(attackerEmail);
+
+        assertThat(redis.hasKey(refreshTokenService.key(VICTIM, "jti-victim")))
+                .as("phiên của nạn nhân bị xoá bởi revokeAll(" + attackerEmail + ")").isTrue();
+        assertThat(redis.hasKey(refreshTokenService.key(attackerEmail, "jti-attacker")))
+                .as("revokeAll vẫn phải xoá đúng phiên của chính email đó").isFalse();
+    }
+
+    @ParameterizedTest(name = "email tấn công = {0}")
+    @MethodSource("globAttackerEmails")
+    @DisplayName("[GIẢ THUYẾT] clearUsed(email chứa * ? [ ]) không được xoá dấu vết 'token đã dùng' của người khác")
+    void clearUsed_withGlobCharacters_doesNotTouchOtherUsersMarkers(String attackerEmail) {
+        refreshTokenService.markUsed(VICTIM, "raw-victim-old");
+        refreshTokenService.markUsed(attackerEmail, "raw-attacker-old");
+
+        refreshTokenService.clearUsed(attackerEmail);
+
+        assertThat(refreshTokenService.isUsed(VICTIM, "raw-victim-old"))
+                .as("dấu vết token đã dùng của nạn nhân bị xoá bởi clearUsed(" + attackerEmail + ")").isTrue();
+        assertThat(refreshTokenService.isUsed(attackerEmail, "raw-attacker-old"))
+                .as("clearUsed vẫn phải xoá đúng dấu vết của chính email đó").isFalse();
+    }
+
+    @Test
+    @DisplayName("[GIẢ THUYẾT] Kẻ tấn công dùng email '*@shared.test' kích hoạt phát hiện dùng lại token: phiên nạn nhân vẫn sống")
+    void reuseDetection_ofWildcardEmailAttacker_doesNotLogOutVictim() throws Exception {
+        String attacker = "*@shared.test";
+        createUser(VICTIM, PASSWORD, Role.USER, 1, 1);
+        createUser(attacker, PASSWORD, Role.USER, 1, 1);
+
+        Tokens attackerFirst = loginOk(attacker, PASSWORD);
+        refreshOk(attackerFirst.refresh());
+        Tokens victim = loginOk(VICTIM, PASSWORD);
+
+        MvcResult replay = refreshRaw(attackerFirst.refresh());
+
+        assertThat(statusOf(replay)).isEqualTo(401);
+        assertThat(sessionKeys(VICTIM)).as("phiên Redis của nạn nhân").hasSize(1);
+        assertThat(statusOf(getWithToken(USER_URL, victim.access()))).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("[GIẢ THUYẾT] Kẻ tấn công '*@shared.test' đăng xuất không được xoá dấu vết token đã dùng của nạn nhân")
+    void logout_ofWildcardEmailAttacker_doesNotEraseVictimReuseMarkers() throws Exception {
+        String attacker = "*@shared.test";
+        createUser(VICTIM, PASSWORD, Role.USER, 1, 1);
+        createUser(attacker, PASSWORD, Role.USER, 1, 1);
+        Tokens victimFirst = loginOk(VICTIM, PASSWORD);
+        refreshOk(victimFirst.refresh());
+        assertThat(refreshTokenService.isUsed(VICTIM, victimFirst.refresh()))
+                .as("tiền điều kiện: token đầu của nạn nhân đã được đánh dấu đã dùng").isTrue();
+        Tokens attackerTokens = loginOk(attacker, PASSWORD);
+
+        assertThat(statusOf(logoutRaw(attackerTokens.refresh()))).isEqualTo(200);
+
+        assertThat(refreshTokenService.isUsed(VICTIM, victimFirst.refresh()))
+                .as("dấu vết token đã dùng của nạn nhân bị xoá => mất khả năng phát hiện dùng lại token").isTrue();
+    }
+
+    private record Outcome(String action, int status) {
+    }
+
+    @Test
+    @DisplayName("Chạy song song logout và refresh cùng một refresh token (40 lượt): logout báo 200 thì không được còn phiên sống")
+    void logoutAndRefreshInParallel_neverLeaveALiveSessionAfterSuccessfulLogout() throws Exception {
+        List<String> violations = new ArrayList<>();
+
+        for (int round = 1; round <= 40; round++) {
+            Tokens tokens = loginOk(EMAIL, PASSWORD);
+            AtomicInteger turn = new AtomicInteger();
+
+            List<Outcome> outcomes = runConcurrently(2, () -> {
+                if (turn.getAndIncrement() == 0) {
+                    return new Outcome("refresh", statusOf(refreshRaw(tokens.refresh())));
+                }
+                return new Outcome("logout", statusOf(logoutRaw(tokens.refresh())));
+            });
+
+            int logoutStatus = outcomes.stream().filter(o -> o.action().equals("logout"))
+                    .findFirst().orElseThrow().status();
+            if (logoutStatus == 200 && !sessionKeys(EMAIL).isEmpty()) {
+                violations.add("lượt " + round + ": logout trả 200 nhưng vẫn còn " + sessionKeys(EMAIL).size()
+                        + " phiên (kết quả: " + outcomes + ")");
+            }
+        }
+
+        assertThat(violations).isEmpty();
+    }
+
 }

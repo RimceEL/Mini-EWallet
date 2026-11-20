@@ -49,15 +49,43 @@ public class RefreshTokenService {
         return stringRedisTemplate.delete(key(email, jti));
     }
 
+    private static final DefaultRedisScript<Long> VALIDATE_AND_REVOKE = new DefaultRedisScript<>("""
+            -- KEYS[1] = refresh_token:<email>:<jti>
+            -- ARGV[1] = sha256(rawToken)
+            local stored = redis.call('GET', KEYS[1])
+            if not stored then
+                return -1
+            end
+            if stored ~= ARGV[1] then
+                return 0
+            end
+            redis.call('DEL', KEYS[1])
+            return 1
+            """, Long.class);
+
+    public boolean validateAndRevoke(String email, String jti, String rawToken) {
+        if (jwtService.isExpired(rawToken)) {
+            throw new ExpiredRefreshTokenException("");
+        }
+        String hashedToken = DigestUtils.sha256Hex(rawToken);
+        Long result = stringRedisTemplate.execute(
+                VALIDATE_AND_REVOKE,
+                List.of(key(email, jti)),
+                hashedToken);
+        if (result == null || result == -1L) {
+            throw new UnloginException("");
+        }
+        return result == 1L;
+    }
+
     public Long revokeAll(String email) {
-        Set<String> keys = stringRedisTemplate.keys("refresh_token:" + email + ":*");
+        Set<String> keys = stringRedisTemplate.keys("refresh_token:" + escapeGlob(email) + ":*");
         if (keys == null || keys.isEmpty()) {
             return 0L;
         }
         return stringRedisTemplate.delete(keys);
     }
 
-    /** Xoá mọi phiên cũ của email rồi lưu phiên mới, trong một bước nguyên tử. */
     public void replaceSession(String email, String jti, String rawToken) {
         stringRedisTemplate.execute(REPLACE_SESSION,
                 List.of(key(email, jti)),
@@ -81,7 +109,7 @@ public class RefreshTokenService {
 
     // Dùng khi logout
     public Long clearUsed(String email) {
-        Set<String> keys = stringRedisTemplate.keys("used_refresh_token:" + email + ":*");
+        Set<String> keys = stringRedisTemplate.keys("used_refresh_token:" + escapeGlob(email) + ":*");
         if (keys == null || keys.isEmpty()) {
             return 0L;
         }
@@ -101,7 +129,7 @@ public class RefreshTokenService {
 
     private static String escapeGlob(String s) {
         return s.replaceAll("([\\\\*?\\[\\]])", "\\\\$1");
-        // Tránh các trường hợp đăng nhập sử dụng ký tự * hoặc ? khiến redis quét nhầm
+        // Tránh các trường hợp đăng nhập sử dụng ký tự *, ?, [] khiến redis quét nhầm
         // và xoá phiên của người khác
     }
 }
