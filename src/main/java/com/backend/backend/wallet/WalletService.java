@@ -17,11 +17,10 @@ public class WalletService {
 
     public void openWallet(String userEmail) {
         try {
-            walletRepository.createWalletByUserEmail(userEmail);
+            if (userEmail == null || userEmail.isBlank() || walletRepository.createWalletByUserEmail(userEmail) == 0)
+                throw new UserNotFoundException("User is not existed");
         } catch (DuplicateKeyException e) {
             throw new WalletOpenedException("This user has already open wallet");
-        } catch (DataIntegrityViolationException e) {
-            throw new UserNotFoundException("User is not existed");
         }
     }
 

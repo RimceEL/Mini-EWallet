@@ -26,12 +26,12 @@ public class WalletRepository {
         return jdbcTemplate.query(sql, wallRowMapper, email).stream().findFirst();
     }
 
-    public void createWalletByUserEmail(String userEmail) throws DataAccessException {
+    public int createWalletByUserEmail(String userEmail) throws DataAccessException {
         String sql = """
                 INSERT INTO wallets (user_id)
                 SELECT id FROM users
                 WHERE email = ?
                 """;
-        jdbcTemplate.update(sql, userEmail);
+        return jdbcTemplate.update(sql, userEmail);
     }
 }

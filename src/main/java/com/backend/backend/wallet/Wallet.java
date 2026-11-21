@@ -16,7 +16,6 @@ public class Wallet {
     private BigDecimal balance;
     private String currency;
     private String status;
-    private Integer version;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Integer pending;
