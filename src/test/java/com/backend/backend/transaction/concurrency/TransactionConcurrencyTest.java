@@ -6,6 +6,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -13,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.sql.DataSource;
 
@@ -23,11 +25,11 @@ import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
@@ -38,7 +40,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import com.zaxxer.hikari.HikariConfig;
 import com.backend.backend.transaction.Transaction;
 import com.backend.backend.transaction.TransactionRepository;
 import com.backend.backend.transaction.TransactionService;
@@ -48,13 +49,14 @@ import com.backend.backend.transaction.customexception.DuplicateTransactionExcep
 import com.backend.backend.transaction.customexception.ExceedPendingException;
 import com.backend.backend.transaction.customexception.TransactionError;
 import com.backend.backend.transaction.customexception.TransactionRecordError;
+import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
 @SpringJUnitConfig(TransactionConcurrencyTest.Config.class)
-@Timeout(value = 120, unit = TimeUnit.SECONDS)
+@Timeout(value = 180, unit = TimeUnit.SECONDS)
 class TransactionConcurrencyTest {
 
     @Container
@@ -76,7 +78,7 @@ class TransactionConcurrencyTest {
             cfg.setPassword(mysql.getPassword());
             cfg.setMaximumPoolSize(40);
             cfg.setMinimumIdle(10);
-            cfg.setConnectionTimeout(10_000);
+            cfg.setConnectionTimeout(15_000);
             HikariDataSource ds = new HikariDataSource(cfg);
 
             Flyway.configure()
@@ -143,6 +145,16 @@ class TransactionConcurrencyTest {
         return walletId;
     }
 
+    private String createWallet(BigDecimal balance, int pending) {
+        String email = "u-" + UUID.randomUUID() + "@test.com";
+        jdbc.update("INSERT INTO users (email, password) VALUES (?, ?)", email, "hash");
+        String userId = jdbc.queryForObject("SELECT id FROM users WHERE email = ?", String.class, email);
+        String walletId = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO wallets (id, user_id, balance, status, pending) VALUES (?, ?, ?, 'ACTIVE', ?)",
+                walletId, userId, balance, pending);
+        return walletId;
+    }
+
     protected void insertPendingTransaction(String referenceId, TransactionType type, String sourceWalletId,
             String destinationWalletId, BigDecimal amount, int ageMinutes) {
         jdbc.update("INSERT INTO transactions (reference_id, type, status, source_wallet_id, "
@@ -176,10 +188,34 @@ class TransactionConcurrencyTest {
         return tx;
     }
 
+    private Transaction seedPending(TransactionType type, String src, String dst, BigDecimal amount, int ageMinutes) {
+        String ref = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO transactions (reference_id, type, status, source_wallet_id, "
+                + "destination_wallet_id, amount, description, created_at) "
+                + "VALUES (?, ?, 'PENDING', ?, ?, ?, 'stress', NOW() - INTERVAL ? MINUTE)",
+                ref, type.name(), src, dst, amount, ageMinutes);
+        jdbc.update("UPDATE wallets SET pending = pending + 1 WHERE id = ?", src);
+        return Transaction.builder()
+                .referenceId(ref)
+                .type(type)
+                .status(TransactionStatus.PENDING)
+                .sourceWalletId(src)
+                .destinationWalletId(dst)
+                .amount(amount)
+                .description("stress")
+                .build();
+    }
+
     protected int countBySourceAndStatus(String walletId, String status) {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM transactions WHERE source_wallet_id = ? AND status = ?",
                 Integer.class, walletId, status);
+    }
+
+    private int countPending(String walletId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM transactions WHERE source_wallet_id = ? AND status = 'PENDING'",
+                Integer.class, walletId);
     }
 
     protected BigDecimal balanceOf(String walletId) {
@@ -246,6 +282,39 @@ class TransactionConcurrencyTest {
 
     protected static <T> List<Outcome<T>> runConcurrently(int threads, Callable<T> task) throws Exception {
         return runConcurrently(Collections.nCopies(threads, task));
+    }
+
+    private static <T> List<Outcome<T>> runConcurrently(int poolSize, List<Callable<T>> tasks) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(poolSize);
+        CountDownLatch ready = new CountDownLatch(poolSize);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            List<Future<Outcome<T>>> futures = new ArrayList<>();
+            for (int i = 0; i < tasks.size(); i++) {
+                Callable<T> task = tasks.get(i);
+                boolean participateInBarrier = i < poolSize;
+                futures.add(pool.submit(() -> {
+                    if (participateInBarrier) {
+                        ready.countDown();
+                    }
+                    go.await();
+                    try {
+                        return new Outcome<>(task.call(), null);
+                    } catch (Throwable t) {
+                        return new Outcome<>(null, t);
+                    }
+                }));
+            }
+            assertThat(ready.await(15, TimeUnit.SECONDS)).isTrue();
+            go.countDown();
+            List<Outcome<T>> results = new ArrayList<>();
+            for (Future<Outcome<T>> f : futures) {
+                results.add(f.get(90, TimeUnit.SECONDS));
+            }
+            return results;
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     protected static long successes(List<? extends Outcome<?>> results) {
@@ -500,5 +569,194 @@ class TransactionConcurrencyTest {
 
         assertThat(pendingOf(wallet)).isEqualTo(countBySourceAndStatus(wallet, "PENDING"));
         assertThat(pendingOf(wallet)).isBetween(0, 5);
+    }
+
+    @Test
+    @DisplayName("Bất biến bảo toàn tiền: 8 ví, 240 thao tác hỗn hợp nạp/rút/chuyển/hết hạn đồng thời (seed cố định)")
+    void conservationInvariant_mixedOperationsAcrossEightWallets_preservesTotalMoneyAndPending() throws Exception {
+        Random rnd = new Random(20261122L);
+        int walletCount = 8;
+        BigDecimal initialPerWallet = BigDecimal.valueOf(5_000);
+        List<String> wallets = new ArrayList<>();
+        for (int i = 0; i < walletCount; i++) {
+            wallets.add(createWallet(initialPerWallet, 0));
+        }
+
+        List<Transaction> seeded = new ArrayList<>();
+        List<Callable<Object>> tasks = new ArrayList<>();
+
+        for (int i = 0; i < 220; i++) {
+            int srcIdx = rnd.nextInt(walletCount);
+            String src = wallets.get(srcIdx);
+            int roll = rnd.nextInt(10);
+            int ageMinutes = rnd.nextInt(4) == 0 ? 31 : 0;
+
+            Transaction tx;
+            if (roll < 3) {
+                BigDecimal amount = BigDecimal.valueOf((rnd.nextInt(10) + 1) * 100L);
+                tx = seedPending(TransactionType.TOP_UP, src, src, amount, ageMinutes);
+            } else if (roll < 6) {
+                BigDecimal amount = BigDecimal.valueOf((rnd.nextInt(25) + 1) * 300L);
+                tx = seedPending(TransactionType.WITHDRAW, src, src, amount, ageMinutes);
+            } else {
+                int dstIdx = (srcIdx + 1 + rnd.nextInt(walletCount - 1)) % walletCount;
+                String dst = wallets.get(dstIdx);
+                BigDecimal amount = BigDecimal.valueOf((rnd.nextInt(20) + 1) * 250L);
+                tx = seedPending(TransactionType.TRANSFER, src, dst, amount, ageMinutes);
+            }
+            seeded.add(tx);
+            tasks.add(() -> {
+                transactionService.execute(tx);
+                return null;
+            });
+        }
+
+        for (int i = 0; i < 20; i++) {
+            tasks.add(() -> transactionRepository.expirePending(30));
+        }
+
+        var results = runConcurrently(24, tasks);
+
+        for (var outcome : results) {
+            if (!outcome.ok()) {
+                assertThat(outcome.error())
+                        .isInstanceOfAny(TransactionError.class, PessimisticLockingFailureException.class);
+            }
+        }
+
+        BigDecimal totalTopUpSuccess = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 'TOP_UP' AND status = 'SUCCESS'",
+                BigDecimal.class);
+        BigDecimal totalWithdrawSuccess = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 'WITHDRAW' AND status = 'SUCCESS'",
+                BigDecimal.class);
+        BigDecimal totalBalanceAfter = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(balance), 0) FROM wallets", BigDecimal.class);
+        BigDecimal totalBalanceBefore = initialPerWallet.multiply(BigDecimal.valueOf(walletCount));
+
+        assertThat(totalBalanceAfter)
+                .isEqualByComparingTo(totalBalanceBefore.add(totalTopUpSuccess).subtract(totalWithdrawSuccess));
+
+        for (String w : wallets) {
+            assertThat(balanceOf(w)).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+            assertThat(pendingOf(w)).isEqualTo(countPending(w));
+        }
+
+        for (String w : wallets) {
+            BigDecimal incoming = jdbc.queryForObject(
+                    "SELECT COALESCE(SUM(amount), 0) FROM transactions "
+                            + "WHERE status = 'SUCCESS' AND ("
+                            + "(type = 'TOP_UP' AND source_wallet_id = ?) OR "
+                            + "(type = 'TRANSFER' AND destination_wallet_id = ?))",
+                    BigDecimal.class, w, w);
+            BigDecimal outgoing = jdbc.queryForObject(
+                    "SELECT COALESCE(SUM(amount), 0) FROM transactions "
+                            + "WHERE status = 'SUCCESS' AND ("
+                            + "(type = 'WITHDRAW' AND source_wallet_id = ?) OR "
+                            + "(type = 'TRANSFER' AND source_wallet_id = ?))",
+                    BigDecimal.class, w, w);
+            assertThat(balanceOf(w))
+                    .as("Số dư ví %s phải khớp lịch sử giao dịch SUCCESS", w)
+                    .isEqualByComparingTo(initialPerWallet.add(incoming).subtract(outgoing));
+        }
+    }
+
+    @RepeatedTest(20)
+    @DisplayName("Race: execute(TRANSFER) chạy đua với expirePending => chỉ 1 bên thắng, tiền không bị tách đôi, pending khớp")
+    void executeTransfer_vs_expirePending_exactlyOneWins() throws Exception {
+        String walletA = createWallet(BigDecimal.valueOf(5_000), 0);
+        String walletB = createWallet(BigDecimal.valueOf(1_000), 0);
+        Transaction tx = seedPending(TransactionType.TRANSFER, walletA, walletB, BigDecimal.valueOf(2_000), 31);
+
+        var results = runConcurrently(2, List.of(
+                () -> {
+                    transactionService.execute(tx);
+                    return null;
+                },
+                () -> transactionRepository.expirePending(30)));
+
+        String finalStatus = statusOf(tx.getReferenceId());
+        assertThat(finalStatus).isIn("SUCCESS", "FAILED");
+        assertThat(results.get(1).ok()).isTrue();
+
+        if ("SUCCESS".equals(finalStatus)) {
+            assertThat(results.get(0).ok()).isTrue();
+            assertThat(balanceOf(walletA)).isEqualByComparingTo("3000");
+            assertThat(balanceOf(walletB)).isEqualByComparingTo("3000");
+        } else {
+            assertThat(results.get(0).error()).isInstanceOf(TransactionError.class);
+            assertThat(balanceOf(walletA)).isEqualByComparingTo("5000");
+            assertThat(balanceOf(walletB)).isEqualByComparingTo("1000");
+        }
+        assertThat(balanceOf(walletA).add(balanceOf(walletB))).isEqualByComparingTo("6000");
+        assertThat(pendingOf(walletA)).isZero();
+    }
+
+    @RepeatedTest(15)
+    @DisplayName("Race: execute(TRANSFER) chạy đua với khoá ví đích (LOCKED) => hoặc xong trọn vẹn, hoặc rollback sạch")
+    void executeTransfer_vs_lockDestinationWallet_allOrNothing() throws Exception {
+        String walletA = createWallet(BigDecimal.valueOf(5_000), 0);
+        String walletB = createWallet(BigDecimal.valueOf(1_000), 0);
+        Transaction tx = seedPending(TransactionType.TRANSFER, walletA, walletB, BigDecimal.valueOf(2_000), 0);
+
+        var results = runConcurrently(2, List.of(
+                () -> {
+                    transactionService.execute(tx);
+                    return null;
+                },
+                () -> jdbc.update("UPDATE wallets SET status = 'LOCKED' WHERE id = ?", walletB)));
+
+        assertThat(results.get(1).ok()).isTrue();
+        assertThat(balanceOf(walletA).add(balanceOf(walletB))).isEqualByComparingTo("6000");
+
+        if (results.get(0).ok()) {
+            assertThat(statusOf(tx.getReferenceId())).isEqualTo("SUCCESS");
+            assertThat(balanceOf(walletA)).isEqualByComparingTo("3000");
+            assertThat(balanceOf(walletB)).isEqualByComparingTo("3000");
+            assertThat(pendingOf(walletA)).isZero();
+        } else {
+            assertThat(results.get(0).error()).isInstanceOf(TransactionError.class);
+            assertThat(statusOf(tx.getReferenceId())).isEqualTo("PENDING");
+            assertThat(balanceOf(walletA)).isEqualByComparingTo("5000");
+            assertThat(balanceOf(walletB)).isEqualByComparingTo("1000");
+            assertThat(pendingOf(walletA)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    @DisplayName("Race: chuyển tiền hai chiều A<->B đồng thời có giao dịch vượt số dư xen kẽ => không sinh/mất tiền")
+    void bidirectionalTransfers_withInsufficientBalanceMix_conservesMoney() throws Exception {
+        String walletA = createWallet(BigDecimal.valueOf(3_000), 0);
+        String walletB = createWallet(BigDecimal.valueOf(3_000), 0);
+        List<Callable<Object>> tasks = new ArrayList<>();
+
+        for (int i = 0; i < 10; i++) {
+            Transaction aToB = seedPending(TransactionType.TRANSFER, walletA, walletB, BigDecimal.valueOf(1_000), 0);
+            Transaction bToA = seedPending(TransactionType.TRANSFER, walletB, walletA, BigDecimal.valueOf(1_000), 0);
+            tasks.add(() -> {
+                transactionService.execute(aToB);
+                return null;
+            });
+            tasks.add(() -> {
+                transactionService.execute(bToA);
+                return null;
+            });
+        }
+
+        var results = runConcurrently(20, tasks);
+
+        AtomicReference<Throwable> unexpected = new AtomicReference<>();
+        results.forEach(o -> {
+            if (!o.ok() && !(o.error() instanceof TransactionError)
+                    && !(o.error() instanceof PessimisticLockingFailureException)) {
+                unexpected.set(o.error());
+            }
+        });
+        assertThat(unexpected.get()).isNull();
+        assertThat(balanceOf(walletA)).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+        assertThat(balanceOf(walletB)).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+        assertThat(balanceOf(walletA).add(balanceOf(walletB))).isEqualByComparingTo("6000");
+        assertThat(pendingOf(walletA)).isEqualTo(countPending(walletA));
+        assertThat(pendingOf(walletB)).isEqualTo(countPending(walletB));
     }
 }
