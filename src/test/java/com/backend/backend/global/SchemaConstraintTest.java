@@ -77,6 +77,9 @@ public class SchemaConstraintTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private DataSource dataSource;
+
     private String walletA;
     private String walletB;
 
@@ -191,7 +194,7 @@ public class SchemaConstraintTest {
     }
 
     @Test
-    @DisplayName("[GIẢ THUYẾT V3] CHECK wallets: hệ thống chỉ dùng VND => chèn USD phải bị từ chối")
+    @DisplayName("CHECK wallets: hệ thống chỉ dùng VND => chèn USD phải bị từ chối")
     void wallet_usdCurrency_shouldBeRejectedWhenVndOnly() {
         String userId = seedUser("usd@test.com");
 
@@ -202,7 +205,7 @@ public class SchemaConstraintTest {
     }
 
     @Test
-    @DisplayName("[GIẢ THUYẾT V3] NOT NULL wallets.pending: chèn pending = NULL phải bị từ chối (mã 1048)")
+    @DisplayName("NOT NULL wallets.pending: chèn pending = NULL phải bị từ chối (mã 1048)")
     void wallet_nullPending_shouldBeRejected() {
         String userId = seedUser("nullpending@test.com");
 
@@ -218,7 +221,7 @@ public class SchemaConstraintTest {
     }
 
     @Test
-    @DisplayName("[GIẢ THUYẾT V3] CHECK wallets.pending: chèn pending âm phải bị từ chối (chk_wallet_pending)")
+    @DisplayName("CHECK wallets.pending: chèn pending âm phải bị từ chối (chk_wallet_pending)")
     void wallet_negativePending_shouldBeRejected() {
         String userId = seedUser("negpending@test.com");
 
@@ -266,5 +269,114 @@ public class SchemaConstraintTest {
                         + "VALUES (?, 'TRANSFER', 'PENDING', NULL, NULL, 100)",
                 UUID.randomUUID().toString()),
                 "chk_txn_has_wallet", "chk_txn_wallets_by_type");
+    }
+
+    @Test
+    @DisplayName("Positive control wallets: chèn ví tối thiểu => nhận default 0 VND, ACTIVE, pending = 0")
+    void wallet_validInsert_isAcceptedWithDefaults() {
+        String userId = seedUser("valid@test.com");
+        String walletId = UUID.randomUUID().toString();
+
+        jdbc.update("INSERT INTO wallets (id, user_id) VALUES (?, ?)", walletId, userId);
+
+        assertThat(
+                jdbc.queryForObject("SELECT balance FROM wallets WHERE id = ?", java.math.BigDecimal.class, walletId))
+                .isEqualByComparingTo("0");
+        assertThat(jdbc.queryForObject("SELECT currency FROM wallets WHERE id = ?", String.class, walletId))
+                .isEqualTo("VND");
+        assertThat(jdbc.queryForObject("SELECT status FROM wallets WHERE id = ?", String.class, walletId))
+                .isEqualTo("ACTIVE");
+        assertThat(jdbc.queryForObject("SELECT pending FROM wallets WHERE id = ?", Integer.class, walletId))
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("Positive control transactions: TOP_UP / WITHDRAW (nguồn = đích) và TRANSFER (nguồn != đích) hợp lệ đều được chấp nhận")
+    void transaction_validInserts_areAccepted() {
+        String sql = "INSERT INTO transactions (reference_id, type, status, source_wallet_id, destination_wallet_id, amount) "
+                + "VALUES (?, ?, 'PENDING', ?, ?, 100)";
+
+        jdbc.update(sql, UUID.randomUUID().toString(), "TOP_UP", walletA, walletA);
+        jdbc.update(sql, UUID.randomUUID().toString(), "WITHDRAW", walletA, walletA);
+        jdbc.update(sql, UUID.randomUUID().toString(), "TRANSFER", walletA, walletB);
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transactions", Integer.class)).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("CHECK transactions: amount âm bị từ chối (chk_txn_amount)")
+    void transaction_negativeAmount_isRejected() {
+        assertCheckViolation(() -> jdbc.update(
+                "INSERT INTO transactions (reference_id, type, status, source_wallet_id, destination_wallet_id, amount) "
+                        + "VALUES (?, 'TOP_UP', 'PENDING', ?, ?, -5)",
+                UUID.randomUUID().toString(), walletA, walletA),
+                "chk_txn_amount");
+    }
+
+    @Test
+    @DisplayName("CHECK transactions: WITHDRAW có nguồn khác đích bị từ chối (chk_txn_wallets_by_type)")
+    void transaction_withdrawDifferentWallets_isRejected() {
+        assertCheckViolation(() -> jdbc.update(
+                "INSERT INTO transactions (reference_id, type, status, source_wallet_id, destination_wallet_id, amount) "
+                        + "VALUES (?, 'WITHDRAW', 'PENDING', ?, ?, 100)",
+                UUID.randomUUID().toString(), walletA, walletB),
+                "chk_txn_wallets_by_type");
+    }
+
+    private Flyway flyway(String target) {
+        var cfg = Flyway.configure()
+                .cleanDisabled(false)
+                .dataSource(dataSource)
+                .locations("classpath:db/migration");
+        if (target != null) {
+            cfg.target(target);
+        }
+        return cfg.load();
+    }
+
+    private String seedLegacyWallet(String email, String balance, String pendingSql) {
+        String userId = seedUser(email);
+        String walletId = UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO wallets (id, user_id, balance, status, pending) VALUES (?, ?, ?, 'ACTIVE', "
+                + pendingSql + ")", walletId, userId, new java.math.BigDecimal(balance));
+        return walletId;
+    }
+
+    @Test
+    @DisplayName("Migration V3 trên dữ liệu cũ: pending = NULL được backfill về 0, cột thành NOT NULL DEFAULT 0, dữ liệu khác giữ nguyên")
+    void migrationV3_backfillsNullPending_andKeepsExistingData() {
+        try {
+            flyway(null).clean();
+            flyway("2").migrate();
+
+            String nullPendingWallet = seedLegacyWallet("legacy-null@test.com", "5000", "NULL");
+            String normalWallet = seedLegacyWallet("legacy-normal@test.com", "7000", "3");
+            assertThat(jdbc.queryForObject("SELECT pending FROM wallets WHERE id = ?", Integer.class,
+                    nullPendingWallet))
+                    .as("tiền đề: trước V3 cột pending phải cho phép NULL")
+                    .isNull();
+
+            flyway(null).migrate();
+
+            assertThat(jdbc.queryForObject("SELECT pending FROM wallets WHERE id = ?", Integer.class,
+                    nullPendingWallet)).isZero();
+            assertThat(jdbc.queryForObject("SELECT pending FROM wallets WHERE id = ?", Integer.class,
+                    normalWallet)).as("ví đã có pending hợp lệ không bị đụng tới").isEqualTo(3);
+            assertThat(jdbc.queryForObject("SELECT balance FROM wallets WHERE id = ?",
+                    java.math.BigDecimal.class, nullPendingWallet)).isEqualByComparingTo("5000");
+            assertThat(jdbc.queryForObject("SELECT currency FROM wallets WHERE id = ?", String.class, normalWallet))
+                    .isEqualTo("VND");
+
+            assertThat(jdbc.queryForObject(
+                    "SELECT is_nullable FROM information_schema.columns "
+                            + "WHERE table_schema = DATABASE() AND table_name = 'wallets' AND column_name = 'pending'",
+                    String.class)).isEqualTo("NO");
+            assertThat(jdbc.queryForObject(
+                    "SELECT column_default FROM information_schema.columns "
+                            + "WHERE table_schema = DATABASE() AND table_name = 'wallets' AND column_name = 'pending'",
+                    String.class)).isEqualTo("0");
+        } finally {
+            flyway(null).migrate();
+        }
     }
 }

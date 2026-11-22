@@ -206,6 +206,11 @@ class TransactionConcurrencyTest {
                 .build();
     }
 
+    private int countSuccessTransfers() {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM transactions WHERE type = 'TRANSFER' AND status = 'SUCCESS'", Integer.class);
+    }
+
     protected int countBySourceAndStatus(String walletId, String status) {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM transactions WHERE source_wallet_id = ? AND status = ?",
@@ -624,6 +629,15 @@ class TransactionConcurrencyTest {
             }
         }
 
+        // Chống pass rỗng: nếu mọi execute đều lỗi thì các bất biến bên dưới vẫn đúng
+        // một cách tầm thường
+        Integer successRows = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM transactions WHERE status = 'SUCCESS'", Integer.class);
+        Integer successTransfers = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM transactions WHERE type = 'TRANSFER' AND status = 'SUCCESS'", Integer.class);
+        assertThat(successRows).as("phải có giao dịch thành công, nếu không test này vô nghĩa").isPositive();
+        assertThat(successTransfers).as("phải có ít nhất một TRANSFER thành công").isPositive();
+
         BigDecimal totalTopUpSuccess = jdbc.queryForObject(
                 "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 'TOP_UP' AND status = 'SUCCESS'",
                 BigDecimal.class);
@@ -745,14 +759,21 @@ class TransactionConcurrencyTest {
 
         var results = runConcurrently(20, tasks);
 
+        // Test này tuyên bố "không deadlock": lỗi khoá (deadlock / lock timeout) KHÔNG
+        // được coi là bình thường.
+        assertThat(count(results, PessimisticLockingFailureException.class))
+                .as("không được có deadlock / lock timeout khi chuyển tiền hai chiều")
+                .isZero();
+
         AtomicReference<Throwable> unexpected = new AtomicReference<>();
         results.forEach(o -> {
-            if (!o.ok() && !(o.error() instanceof TransactionError)
-                    && !(o.error() instanceof PessimisticLockingFailureException)) {
+            if (!o.ok() && !(o.error() instanceof TransactionError)) {
                 unexpected.set(o.error());
             }
         });
         assertThat(unexpected.get()).isNull();
+        assertThat(successes(results)).as("phải có giao dịch thành công").isPositive();
+        assertThat(countSuccessTransfers()).isEqualTo((int) successes(results));
         assertThat(balanceOf(walletA)).isGreaterThanOrEqualTo(BigDecimal.ZERO);
         assertThat(balanceOf(walletB)).isGreaterThanOrEqualTo(BigDecimal.ZERO);
         assertThat(balanceOf(walletA).add(balanceOf(walletB))).isEqualByComparingTo("6000");
