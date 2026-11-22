@@ -7,16 +7,11 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 
 import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,18 +23,14 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
+import com.backend.backend.transaction.MySqlIntegrationTestBase;
 import com.backend.backend.transaction.Transaction;
 import com.backend.backend.transaction.TransactionRepository;
 import com.backend.backend.transaction.TransactionService;
@@ -47,19 +38,11 @@ import com.backend.backend.transaction.TransactionStatus;
 import com.backend.backend.transaction.TransactionType;
 import com.backend.backend.transaction.customexception.TransactionError;
 import com.backend.backend.transaction.customexception.TransactionRecordError;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-@Testcontainers
 @SpringJUnitConfig(TransactionAtomicityTest.Config.class)
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
-public class TransactionAtomicityTest {
-
-    @Container
-    static MySQLContainer mysql = new MySQLContainer(DockerImageName.parse("mysql:8.1"))
-            .withDatabaseName("wallet_test")
-            .withUsername("test")
-            .withPassword("test");
+public class TransactionAtomicityTest extends MySqlIntegrationTestBase {
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableTransactionManagement
@@ -68,19 +51,7 @@ public class TransactionAtomicityTest {
 
         @Bean(destroyMethod = "close")
         HikariDataSource dataSource() {
-            HikariConfig cfg = new HikariConfig();
-            cfg.setJdbcUrl(mysql.getJdbcUrl());
-            cfg.setUsername(mysql.getUsername());
-            cfg.setPassword(mysql.getPassword());
-            cfg.setMaximumPoolSize(10);
-            HikariDataSource ds = new HikariDataSource(cfg);
-
-            Flyway.configure()
-                    .dataSource(ds)
-                    .locations("classpath:db/migration")
-                    .load()
-                    .migrate();
-            return ds;
+            return newDataSource(10, 10, 30000);
         }
 
         @Bean
@@ -100,31 +71,9 @@ public class TransactionAtomicityTest {
     @MockitoSpyBean
     private TransactionRepository transactionRepository;
 
-    @Autowired
-    private JdbcTemplate jdbc;
-
     @BeforeEach
     void resetState() {
         reset(transactionRepository);
-        jdbc.execute((ConnectionCallback<Void>) con -> {
-            try (Statement st = con.createStatement()) {
-                st.execute("SET FOREIGN_KEY_CHECKS = 0");
-                List<String> tables = new ArrayList<>();
-                try (ResultSet rs = st.executeQuery(
-                        "SELECT table_name FROM information_schema.tables "
-                                + "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' "
-                                + "AND table_name <> 'flyway_schema_history'")) {
-                    while (rs.next()) {
-                        tables.add(rs.getString(1));
-                    }
-                }
-                for (String table : tables) {
-                    st.execute("TRUNCATE TABLE `" + table + "`");
-                }
-                st.execute("SET FOREIGN_KEY_CHECKS = 1");
-            }
-            return null;
-        });
     }
 
     private void createWalletWithId(String walletId, String balance, int pending) {
@@ -149,18 +98,6 @@ public class TransactionAtomicityTest {
                 .amount(new BigDecimal(amount))
                 .description("test")
                 .build();
-    }
-
-    private BigDecimal balanceOf(String id) {
-        return jdbc.queryForObject("SELECT balance FROM wallets WHERE id = ?", BigDecimal.class, id);
-    }
-
-    private int pendingOf(String id) {
-        return jdbc.queryForObject("SELECT pending FROM wallets WHERE id = ?", Integer.class, id);
-    }
-
-    private String statusOf(String ref) {
-        return jdbc.queryForObject("SELECT status FROM transactions WHERE reference_id = ?", String.class, ref);
     }
 
     @ParameterizedTest(name = "nguồn={0}, đích={1}")

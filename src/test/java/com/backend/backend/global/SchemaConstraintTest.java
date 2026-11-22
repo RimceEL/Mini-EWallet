@@ -3,11 +3,7 @@ package com.backend.backend.global;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -24,48 +20,25 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
-import com.zaxxer.hikari.HikariConfig;
+import com.backend.backend.transaction.MySqlIntegrationTestBase;
 import com.zaxxer.hikari.HikariDataSource;
 
-@Testcontainers
 @SpringJUnitConfig(SchemaConstraintTest.Config.class)
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
-public class SchemaConstraintTest {
+public class SchemaConstraintTest extends MySqlIntegrationTestBase {
 
     private static final int MYSQL_CHECK_CONSTRAINT_VIOLATED = 3819;
     private static final int MYSQL_BAD_NULL_ERROR = 1048;
-
-    @Container
-    static MySQLContainer mysql = new MySQLContainer(DockerImageName.parse("mysql:8.1"))
-            .withDatabaseName("wallet_test")
-            .withUsername("test")
-            .withPassword("test");
 
     @TestConfiguration(proxyBeanMethods = false)
     static class Config {
 
         @Bean(destroyMethod = "close")
         HikariDataSource dataSource() {
-            HikariConfig cfg = new HikariConfig();
-            cfg.setJdbcUrl(mysql.getJdbcUrl());
-            cfg.setUsername(mysql.getUsername());
-            cfg.setPassword(mysql.getPassword());
-            HikariDataSource ds = new HikariDataSource(cfg);
-
-            Flyway.configure()
-                    .dataSource(ds)
-                    .locations("classpath:db/migration")
-                    .load()
-                    .migrate();
-            return ds;
+            return newDataSource(10, 10, 30000);
         }
 
         @Bean
@@ -75,9 +48,6 @@ public class SchemaConstraintTest {
     }
 
     @Autowired
-    private JdbcTemplate jdbc;
-
-    @Autowired
     private DataSource dataSource;
 
     private String walletA;
@@ -85,25 +55,6 @@ public class SchemaConstraintTest {
 
     @BeforeEach
     void setUp() {
-        jdbc.execute((ConnectionCallback<Void>) con -> {
-            try (Statement st = con.createStatement()) {
-                st.execute("SET FOREIGN_KEY_CHECKS = 0");
-                List<String> tables = new ArrayList<>();
-                try (ResultSet rs = st.executeQuery(
-                        "SELECT table_name FROM information_schema.tables "
-                                + "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' "
-                                + "AND table_name <> 'flyway_schema_history'")) {
-                    while (rs.next()) {
-                        tables.add(rs.getString(1));
-                    }
-                }
-                for (String table : tables) {
-                    st.execute("TRUNCATE TABLE `" + table + "`");
-                }
-                st.execute("SET FOREIGN_KEY_CHECKS = 1");
-            }
-            return null;
-        });
 
         walletA = seedWallet("a@test.com");
         walletB = seedWallet("b@test.com");

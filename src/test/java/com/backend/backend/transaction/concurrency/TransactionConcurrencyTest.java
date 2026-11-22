@@ -1,8 +1,6 @@
 package com.backend.backend.transaction.concurrency;
 
 import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -18,8 +16,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.sql.DataSource;
 
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -29,17 +25,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.PessimisticLockingFailureException;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
+import com.backend.backend.transaction.MySqlIntegrationTestBase;
 import com.backend.backend.transaction.Transaction;
 import com.backend.backend.transaction.TransactionRepository;
 import com.backend.backend.transaction.TransactionService;
@@ -49,21 +41,13 @@ import com.backend.backend.transaction.customexception.DuplicateTransactionExcep
 import com.backend.backend.transaction.customexception.ExceedPendingException;
 import com.backend.backend.transaction.customexception.TransactionError;
 import com.backend.backend.transaction.customexception.TransactionRecordError;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
 @SpringJUnitConfig(TransactionConcurrencyTest.Config.class)
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
-class TransactionConcurrencyTest {
-
-    @Container
-    static MySQLContainer mysql = new MySQLContainer(DockerImageName.parse("mysql:8.1"))
-            .withDatabaseName("wallet_test")
-            .withUsername("test")
-            .withPassword("test");
+public class TransactionConcurrencyTest extends MySqlIntegrationTestBase {
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableTransactionManagement
@@ -72,21 +56,7 @@ class TransactionConcurrencyTest {
 
         @Bean(destroyMethod = "close")
         HikariDataSource dataSource() {
-            HikariConfig cfg = new HikariConfig();
-            cfg.setJdbcUrl(mysql.getJdbcUrl());
-            cfg.setUsername(mysql.getUsername());
-            cfg.setPassword(mysql.getPassword());
-            cfg.setMaximumPoolSize(40);
-            cfg.setMinimumIdle(10);
-            cfg.setConnectionTimeout(15_000);
-            HikariDataSource ds = new HikariDataSource(cfg);
-
-            Flyway.configure()
-                    .dataSource(ds)
-                    .locations("classpath:db/migration")
-                    .load()
-                    .migrate();
-            return ds;
+            return newDataSource(40, 10, 15000);
         }
 
         @Bean
@@ -104,31 +74,6 @@ class TransactionConcurrencyTest {
     protected TransactionService transactionService;
     @Autowired
     protected TransactionRepository transactionRepository;
-    @Autowired
-    protected JdbcTemplate jdbc;
-
-    @BeforeEach
-    void cleanDatabase() {
-        jdbc.execute((ConnectionCallback<Void>) con -> {
-            try (Statement st = con.createStatement()) {
-                st.execute("SET FOREIGN_KEY_CHECKS = 0");
-                List<String> tables = new ArrayList<>();
-                try (ResultSet rs = st.executeQuery(
-                        "SELECT table_name FROM information_schema.tables "
-                                + "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' "
-                                + "AND table_name <> 'flyway_schema_history'")) {
-                    while (rs.next()) {
-                        tables.add(rs.getString(1));
-                    }
-                }
-                for (String table : tables) {
-                    st.execute("TRUNCATE TABLE `" + table + "`");
-                }
-                st.execute("SET FOREIGN_KEY_CHECKS = 1");
-            }
-            return null;
-        });
-    }
 
     protected String createWallet(BigDecimal balance) {
         return createWallet(balance, "ACTIVE");
@@ -221,19 +166,6 @@ class TransactionConcurrencyTest {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM transactions WHERE source_wallet_id = ? AND status = 'PENDING'",
                 Integer.class, walletId);
-    }
-
-    protected BigDecimal balanceOf(String walletId) {
-        return jdbc.queryForObject("SELECT balance FROM wallets WHERE id = ?", BigDecimal.class, walletId);
-    }
-
-    protected int pendingOf(String walletId) {
-        return jdbc.queryForObject("SELECT pending FROM wallets WHERE id = ?", Integer.class, walletId);
-    }
-
-    protected String statusOf(String referenceId) {
-        return jdbc.queryForObject("SELECT status FROM transactions WHERE reference_id = ?", String.class,
-                referenceId);
     }
 
     protected int countTransactions(String referenceId) {

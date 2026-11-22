@@ -3,8 +3,6 @@ package com.backend.backend.wallet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -18,8 +16,6 @@ import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -28,32 +24,20 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
+import com.backend.backend.transaction.MySqlIntegrationTestBase;
 import com.backend.backend.wallet.customexception.UserNotFoundException;
 import com.backend.backend.wallet.customexception.WalletOpenedException;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-@Testcontainers
 @SpringJUnitConfig(WalletRepositoryTest.Config.class)
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
-public class WalletRepositoryTest {
-
-    @Container
-    static MySQLContainer mysql = new MySQLContainer(DockerImageName.parse("mysql:8.1"))
-            .withDatabaseName("wallet_test")
-            .withUsername("test")
-            .withPassword("test");
+public class WalletRepositoryTest extends MySqlIntegrationTestBase {
 
     @TestConfiguration(proxyBeanMethods = false)
     @EnableTransactionManagement
@@ -62,21 +46,7 @@ public class WalletRepositoryTest {
 
         @Bean(destroyMethod = "close")
         HikariDataSource dataSource() {
-            HikariConfig cfg = new HikariConfig();
-            cfg.setJdbcUrl(mysql.getJdbcUrl());
-            cfg.setUsername(mysql.getUsername());
-            cfg.setPassword(mysql.getPassword());
-            cfg.setMaximumPoolSize(20);
-            cfg.setMinimumIdle(5);
-            cfg.setConnectionTimeout(10_000);
-            HikariDataSource ds = new HikariDataSource(cfg);
-
-            Flyway.configure()
-                    .dataSource(ds)
-                    .locations("classpath:db/migration")
-                    .load()
-                    .migrate();
-            return ds;
+            return newDataSource(20, 5, 10000);
         }
 
         @Bean
@@ -95,32 +65,6 @@ public class WalletRepositoryTest {
 
     @Autowired
     private WalletService walletService;
-
-    @Autowired
-    private JdbcTemplate jdbc;
-
-    @BeforeEach
-    void cleanDatabase() {
-        jdbc.execute((ConnectionCallback<Void>) con -> {
-            try (Statement st = con.createStatement()) {
-                st.execute("SET FOREIGN_KEY_CHECKS = 0");
-                List<String> tables = new ArrayList<>();
-                try (ResultSet rs = st.executeQuery(
-                        "SELECT table_name FROM information_schema.tables "
-                                + "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' "
-                                + "AND table_name <> 'flyway_schema_history'")) {
-                    while (rs.next()) {
-                        tables.add(rs.getString(1));
-                    }
-                }
-                for (String table : tables) {
-                    st.execute("TRUNCATE TABLE `" + table + "`");
-                }
-                st.execute("SET FOREIGN_KEY_CHECKS = 1");
-            }
-            return null;
-        });
-    }
 
     private String seedUser(String email) {
         jdbc.update("INSERT INTO users (email, password) VALUES (?, ?)", email, "hashed-password");
