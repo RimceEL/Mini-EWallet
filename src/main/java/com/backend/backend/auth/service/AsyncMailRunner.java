@@ -25,6 +25,7 @@ public class AsyncMailRunner {
         }
     }
 
+    @Async
     public void run(Runnable mailTask) {
         run(mailTask, e -> {
         });

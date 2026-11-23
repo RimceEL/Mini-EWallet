@@ -20,7 +20,20 @@ public class OtpService {
 
     private final SecretKeySpec keySpec;
 
+    private int MIN_SECRET_BYTES = 32;
+
     public OtpService(@Value("${app.otp.secret}") String secret) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("app.otp.secret không được để trống");
+        }
+
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "app.otp.secret phải có độ dài tối thiểu " + MIN_SECRET_BYTES + " byte (hiện tại: "
+                            + keyBytes.length
+                            + " byte)");
+        }
         this.keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 

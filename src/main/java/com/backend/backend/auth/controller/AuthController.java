@@ -25,6 +25,7 @@ import com.backend.backend.global.DataNormalizer;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
 import java.util.Date;
@@ -67,6 +68,8 @@ public class AuthController {
     @PostMapping("/auth/register")
     public ApiResponse<String> register(@RequestBody RegisterRequest request) {
         request.setEmail(DataNormalizer.normalizeEmail(request.getEmail()));
+        request.setFullName(DataNormalizer.normalizeText(request.getFullName()));
+        request.setUsername(DataNormalizer.normalizeText(request.getUsername()));
         authService.register(request);
         return new ApiResponse<String>(0, "Register successfully", "");
     }

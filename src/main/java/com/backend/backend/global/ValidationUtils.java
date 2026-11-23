@@ -4,7 +4,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 public class ValidationUtils {
-    private static final String EMAIL_REGEX = "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$";
+    private static final String EMAIL_REGEX = "^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+            + "@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$";
     private static final Pattern EMAIL_PATTERN = Pattern.compile(EMAIL_REGEX);
     private static final String PASSWORD_REGEX = "^(?=.*\\p{Lu})(?=.*[\\p{P}\\p{S}]).{12,}$";
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(PASSWORD_REGEX);
@@ -36,7 +37,7 @@ public class ValidationUtils {
         if (username.getBytes(StandardCharsets.UTF_8).length > 72) {
             return false;
         }
-        return username.trim().length() >= 6;
+        return username.strip().length() >= 6;
     }
 
     public static boolean isValidFullName(String fullName) {
@@ -46,6 +47,6 @@ public class ValidationUtils {
         if (fullName.getBytes(StandardCharsets.UTF_8).length > 72) {
             return false;
         }
-        return fullName.trim().length() >= 6;
+        return fullName.strip().length() >= 6;
     }
 }
