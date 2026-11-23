@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.backend.backend.auth.security.SecurityIntegrationTestBase;
@@ -19,23 +20,6 @@ import com.backend.backend.auth.security.SecurityIntegrationTestBase;
 import static org.junit.jupiter.api.Named.named;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
-/**
- * Hai lỗ hổng logic trong đăng ký (AuthService.register).
- *
- * L5: kiểm tra "email đã tồn tại" rồi mới INSERT (check-then-insert). Hai
- * request cùng email chạy song song đều
- * qua được bước kiểm tra; UNIQUE(email) giữ cho dữ liệu đúng nhưng người thua
- * nhận DuplicateKeyException không được
- * GlobalExceptionHandler xử lý riêng => 500 thay vì 409. Cách sửa gợi ý: bắt
- * DuplicateKeyException và ném
- * UserExistedException.
- *
- * L6 (phần đăng ký): không có giới hạn độ dài tối đa. Email/username/fullName
- * vượt varchar(255) làm INSERT lỗi => 500;
- * mật khẩu dài hơn 72 byte vượt giới hạn của BCrypt (bị từ chối hoặc cắt âm
- * thầm). Mong đợi: 400, không tạo user,
- * không gửi mail. Giới hạn mật khẩu tính theo BYTE UTF-8.
- */
 public class RegisterLogicTest extends SecurityIntegrationTestBase {
 
     private static final String EMAIL = "moi@gmail.com";
@@ -52,8 +36,6 @@ public class RegisterLogicTest extends SecurityIntegrationTestBase {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE email = ?", Integer.class, email);
         return count == null ? 0 : count;
     }
-
-    // ---------------------------------------------------------------- L5
 
     @Test
     @DisplayName("[GIẢ THUYẾT] 10 request đăng ký song song cùng một email (5 vòng): đúng 1 thành công, còn lại đều 409, không có 500")
@@ -76,8 +58,6 @@ public class RegisterLogicTest extends SecurityIntegrationTestBase {
 
         assertThat(violations).as("mong đợi mỗi vòng đúng 1 lần 200 và 9 lần 409").isEmpty();
     }
-
-    // ---------------------------------------------------------------- L6
 
     static Stream<Arguments> oversizedInputs() {
         String longLocalPartEmail = "a".repeat(250) + "@gmail.com";
@@ -123,5 +103,62 @@ public class RegisterLogicTest extends SecurityIntegrationTestBase {
 
     private static String abbreviate(String text) {
         return text.length() <= 200 ? text : text.substring(0, 200) + "...";
+    }
+
+    private String userColumn(String column, String email) {
+        return jdbc.queryForObject("SELECT " + column + " FROM users WHERE email = ?", String.class, email);
+    }
+
+    @Test
+    @DisplayName("[GIẢ THUYẾT] Username và fullName thừa khoảng trắng hai đầu và ở giữa => đăng ký được, DB lưu bản đã chuẩn hoá")
+    void register_extraWhitespace_isStoredNormalized() throws Exception {
+        MvcResult result = register(EMAIL, "  nguoidung01  ", PASSWORD, "  Nguyen   Van   An  ");
+
+        assertThat(statusOf(result)).as(body(result)).isEqualTo(200);
+        assertThat(userColumn("username", EMAIL)).isEqualTo("nguoidung01");
+        assertThat(userColumn("full_name", EMAIL)).isEqualTo("Nguyen Van An");
+    }
+
+    @Test
+    @DisplayName("[Đối chứng] Email viết hoa và thừa khoảng trắng => DB lưu email chữ thường, đã strip")
+    void register_emailCaseAndWhitespace_isStoredNormalized() throws Exception {
+        MvcResult result = register("  MOI@GMAIL.COM  ", USERNAME, PASSWORD, FULL_NAME);
+
+        assertThat(statusOf(result)).as(body(result)).isEqualTo(200);
+        assertThat(countUsersWithEmail("moi@gmail.com")).isEqualTo(1);
+    }
+
+    @ParameterizedTest(name = "username = [{0}]")
+    @ValueSource(strings = { "      ", "  abc  ", "\u3000\u3000\u3000\u3000\u3000\u3000" })
+    @DisplayName("Username toàn khoảng trắng (kể cả khoảng trắng Unicode) hoặc ngắn hơn 6 ký tự sau khi strip => 400, không tạo user, không gửi mail")
+    void register_blankOrShortUsername_isRejected(String username) throws Exception {
+        MvcResult result = register("blank-u@gmail.com", username, PASSWORD, FULL_NAME);
+
+        assertThat(statusOf(result)).as(abbreviate(body(result))).isEqualTo(400);
+        assertThat(countUsersWithEmail("blank-u@gmail.com")).isZero();
+        verifyNoInteractions(emailService);
+    }
+
+    @ParameterizedTest(name = "fullName = [{0}]")
+    @ValueSource(strings = { "      ", "  An  ", "\u3000\u3000\u3000\u3000\u3000\u3000" })
+    @DisplayName("Họ tên toàn khoảng trắng (kể cả khoảng trắng Unicode) hoặc ngắn hơn 6 ký tự sau khi strip => 400, không tạo user, không gửi mail")
+    void register_blankOrShortFullName_isRejected(String fullName) throws Exception {
+        MvcResult result = register("blank-f@gmail.com", USERNAME, PASSWORD, fullName);
+
+        assertThat(statusOf(result)).as(abbreviate(body(result))).isEqualTo(400);
+        assertThat(countUsersWithEmail("blank-f@gmail.com")).isZero();
+        verifyNoInteractions(emailService);
+    }
+
+    @Test
+    @DisplayName("[GIẢ THUYẾT] Độn khoảng trắng giữa chữ không giúp vượt ngưỡng 6 ký tự: 'a    b    c' chỉ còn 5 ký tự sau khi chuẩn hoá => 400")
+    void register_paddingBetweenWords_doesNotBypassMinLength() throws Exception {
+        MvcResult username = register("pad-u@gmail.com", "a    b    c", PASSWORD, FULL_NAME);
+        MvcResult fullName = register("pad-f@gmail.com", USERNAME, PASSWORD, "A    B    C");
+
+        assertThat(statusOf(username)).as(abbreviate(body(username))).isEqualTo(400);
+        assertThat(statusOf(fullName)).as(abbreviate(body(fullName))).isEqualTo(400);
+        assertThat(countUsersWithEmail("pad-u@gmail.com")).isZero();
+        assertThat(countUsersWithEmail("pad-f@gmail.com")).isZero();
     }
 }
