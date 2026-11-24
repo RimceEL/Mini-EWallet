@@ -63,6 +63,9 @@ public class PasswordResetService {
      * Bước 1: xin OTP. Luôn trả về bình thường dù email có tồn tại hay không.
      */
     public void requestReset(String email) {
+        if (!ValidationUtils.isValidEmail(email)) {
+            throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
+        }
         String key = RESEND_PREFIX + email;
         Long attempts = rateLimiter.hit(key, resendLockHours * 3600L, maxResendAttempts);
         if (attempts > maxResendAttempts)
@@ -91,6 +94,9 @@ public class PasswordResetService {
     private static final String OTP_INVALID_MSG = "Otp đã hết hạn hoặc không hợp lệ";
 
     public String verifyOtp(String email, String otp) {
+        if (!ValidationUtils.isValidEmail(email)) {
+            throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
+        }
         String otpKey = OTP_PREFIX + email;
         String failKey = OTP_FAIL_PREFIX + email;
 
@@ -127,6 +133,9 @@ public class PasswordResetService {
     private static final String TOKEN_INVALID_MSG = "Token đã hết hạn hoặc không hợp lệ";
 
     public void resetPassword(String email, String token, String newPassword) {
+        if (!ValidationUtils.isValidEmail(email)) {
+            throw new InvalidRegisterRequest("Định dạng email không hợp lệ");
+        }
         if (token == null || token.isBlank()) {
             throw new InvalidResetTokenException("Phải gửi kèm token");
         }

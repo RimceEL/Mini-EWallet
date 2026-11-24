@@ -17,6 +17,7 @@ public class User implements UserDetails {
     private String id;
     private String email;
     private String username;
+    @ToString.Exclude
     private String password;
     private Role role;
     private String fullName;
@@ -48,7 +49,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return isActive >= 1;
+        return isActive != null && isActive >= 1;
     }
 
     @Override
@@ -58,6 +59,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isVerified >= 1;
+        return isVerified != null && isVerified >= 1;
     }
 }

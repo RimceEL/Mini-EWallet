@@ -25,7 +25,6 @@ import com.backend.backend.global.DataNormalizer;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
 import java.util.Date;

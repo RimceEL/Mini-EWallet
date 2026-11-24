@@ -17,22 +17,6 @@ import org.testcontainers.utility.DockerImageName;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-/**
- * Base dùng chung cho các test cần MySQL thật (Testcontainers + Flyway).
- *
- * <ul>
- * <li>Một container MySQL duy nhất cho cả JVM (singleton, giống
- * SecurityIntegrationTestBase), không còn mỗi class
- * một container.</li>
- * <li>Mỗi test bắt đầu với các bảng rỗng (TRUNCATE tất cả bảng trừ
- * flyway_schema_history).</li>
- * <li>Helper đọc nhanh balance / pending / status.</li>
- * </ul>
- *
- * Mỗi lớp con vẫn tự khai báo {@code @SpringJUnitConfig(...Config.class)} và
- * gọi {@link #newDataSource} trong bean
- * dataSource của nó (kích thước pool khác nhau tuỳ test).
- */
 public abstract class MySqlIntegrationTestBase {
 
     protected static final MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.1"))
@@ -44,7 +28,6 @@ public abstract class MySqlIntegrationTestBase {
         MYSQL.start();
     }
 
-    /** Tạo pool trỏ vào container dùng chung và chạy toàn bộ migration Flyway. */
     public static HikariDataSource newDataSource(int maxPoolSize, int minIdle, long connectionTimeoutMs) {
         HikariConfig cfg = new HikariConfig();
         cfg.setJdbcUrl(MYSQL.getJdbcUrl());
