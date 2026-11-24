@@ -55,6 +55,23 @@ public class RateLimiter {
         return r != null && r == 1L;
     }
 
+    private static final DefaultRedisScript<Long> COMPARE_AND_DELETE_3WAY = new DefaultRedisScript<>("""
+            local stored = redis.call('GET', KEYS[1])
+            if not stored then
+                return -1
+            end
+            if stored ~= ARGV[1] then
+                return 0
+            end
+            redis.call('DEL', KEYS[1])
+            return 1
+            """, Long.class);
+
+    public Long compareAndDeleteReturnLong(String key, String expected) {
+        Long r = redis.execute(COMPARE_AND_DELETE_3WAY, List.of(key), expected);
+        return r;
+    }
+
     private static final DefaultRedisScript<Long> SET_EX_AND_DEL = new DefaultRedisScript<>("""
             redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
             for i = 2, #KEYS do

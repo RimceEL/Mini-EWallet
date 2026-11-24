@@ -74,6 +74,8 @@ public class AuthService {
     }
 
     public void verifyEmail(String email, String code) {
+        if (email == null || email.isBlank() || !ValidationUtils.isValidEmail(email))
+            throw new InvalidVerifyRequestException("Email yêu cầu không tồn tại hoặc sai định dạng");
         emailVerificationService.verify(email, code);
         authRepository.markVerified(email);
     }

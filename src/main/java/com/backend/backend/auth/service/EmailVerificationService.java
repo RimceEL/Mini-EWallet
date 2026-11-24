@@ -84,16 +84,28 @@ public class EmailVerificationService {
             throw new TooManyVerificationAttemptsException(
                     "Bạn đã nhập sai quá số lần cho phép, vui lòng yêu cầu gửi lại mã");
         }
-        String storedCode = stringRedisTemplate.opsForValue().get(codeKey(email));
-        if (storedCode == null) {
+        // String storedCode = stringRedisTemplate.opsForValue().get(codeKey(email));
+        // if (storedCode == null) {
+        // throw new ExpiredVerificationCodeException(
+        // "Mã xác thực đã hết hạn, không tồn tại hoặc email không hợp lệ, vui lòng yêu
+        // cầu gửi lại mã");
+        // }
+        // if (!storedCode.equals(inputCode)) {
+        // throw new InvalidVerificationCodeException("Mã xác thực không đúng");
+        // }
+
+        // stringRedisTemplate.delete(codeKey(email));
+
+        // Cách cũ trên không an toàn đa luồng
+        if (inputCode == null)
+            throw new InvalidVerificationCodeException("Mã xác thực không đúng");
+        Long result = rateLimiter.compareAndDeleteReturnLong(codeKey(email), inputCode);
+        if (result == null || result == -1L)
             throw new ExpiredVerificationCodeException(
                     "Mã xác thực đã hết hạn, không tồn tại hoặc email không hợp lệ, vui lòng yêu cầu gửi lại mã");
-        }
-        if (!storedCode.equals(inputCode)) {
+        if (result == 0L)
             throw new InvalidVerificationCodeException("Mã xác thực không đúng");
-        }
-
-        stringRedisTemplate.delete(codeKey(email));
         stringRedisTemplate.delete(attemptsKey);
+
     }
 }
