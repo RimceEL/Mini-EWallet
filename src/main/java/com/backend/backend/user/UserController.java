@@ -21,7 +21,7 @@ public class UserController {
         UserDetailResponse result = UserDetailResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .username(user.getUsername())
+                .username(user.getName())
                 .fullName(user.getFullName())
                 .phoneNumber(user.getPhoneNumber())
                 .address(user.getAddress())
